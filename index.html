@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RoboCoach Video Review</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#11151b;color:#edf2f8;font:16px system-ui,sans-serif}main{max-width:1120px;margin:40px auto;padding:0 20px}header,.tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap}header{justify-content:space-between}h1{font-size:25px}button,.open{font:inherit;padding:9px 14px;border:1px solid #465363;border-radius:8px;background:#242d39;color:inherit;cursor:pointer}button[aria-pressed=true],.open{background:#b9f47e;color:#152110;border-color:#b9f47e}button:disabled{opacity:.4;cursor:default}.stage{position:relative;background:#06080a;border:1px solid #35404d;border-radius:12px;overflow:hidden;margin:12px 0}video{display:block;width:100%;height:min(60vh,630px);object-fit:contain}canvas{position:absolute;pointer-events:none}canvas.drawing{pointer-events:auto;touch-action:none;cursor:crosshair}.empty{position:absolute;inset:0;display:grid;place-items:center;color:#aab6c5;pointer-events:none}[hidden]{display:none!important}.seek{flex:1;min-width:120px;accent-color:#b9f47e}.hint{color:#aab6c5;font-size:14px}input[type=color]{width:36px;height:34px;background:transparent;border:0;padding:0}
+.timeline{position:relative;height:22px;margin:4px 8px 0}.marker{position:absolute;top:3px;transform:translateX(-50%);width:15px;height:15px;padding:0;border:2px solid #11151b;border-radius:50%;background:#b9f47e}.marker:hover,.marker:focus-visible{outline:2px solid white}.track{flex:1;min-width:120px}.track input{width:100%;margin:0;display:block}dialog{background:#242d39;color:inherit;border:1px solid #465363;border-radius:12px;width:min(420px,90vw);padding:20px}dialog::backdrop{background:#0008}textarea{display:block;width:100%;margin:10px 0 16px;padding:10px;background:#11151b;color:inherit;border:1px solid #708093;border-radius:6px;font:inherit}
+.library{margin:12px 0 18px;padding:14px;background:#1a222c;border-radius:10px}.library summary{cursor:pointer;font-weight:600}.library .tools{margin-top:12px}.library select,.library input{font:inherit;padding:6px;max-width:100%}.library select{min-width:130px}
+main{max-width:1440px;display:grid;grid-template-columns:250px minmax(0,1fr);gap:0 24px;margin:24px auto}
+header{grid-column:1/-1;margin-bottom:12px}h1{margin:8px 0;font-weight:650;letter-spacing:-.025em}
+.library{margin:0;padding:18px;background:#181f28;border:1px solid #35404d;align-self:start}
+.library h2{font-size:16px;margin:0 0 18px}.library .tools,.library form{display:grid;gap:8px}
+.library label{color:#aab6c5;font-size:13px}
+.library select,.library input{width:100%;min-width:0;background:#11151b;color:inherit;border:1px solid #465363;border-radius:7px;padding:8px}
+.library button{text-align:left}.library .hint{margin-bottom:0}.review{min-width:0}.stage{margin-top:0}
+@media(max-width:680px){main{grid-template-columns:minmax(0,1fr);row-gap:16px;margin-top:12px}.library{grid-row:3}header{margin-bottom:0}}
+#libraryTree{margin-top:14px}.library button.tree-folder,.library button.tree-video{display:block;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:0;background:transparent;padding:7px 9px;font-size:14px}.library button.tree-folder:hover,.library button.tree-video:hover{background:#263543}.library button[data-selected=true]{background:#253642}.library button[aria-current=true]{background:#364a34;color:#c9f6a6}.tree-children{margin-left:14px;padding-left:6px;border-left:1px solid #435364;color:#aab6c5;font-size:13px}
+body{background:#1e1e1e;color:#ccc}main{max-width:none;min-height:100vh;margin:0;padding:0;grid-template-columns:258px minmax(0,1fr);grid-template-rows:auto 1fr;gap:0}
+header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px solid #333;background:#252526}h1{font-size:15px;margin:0;font-weight:500;letter-spacing:0}.open{background:#0e639c;border:0;border-radius:3px;color:#fff;padding:6px 12px;font-size:13px}
+.library{grid-column:1;grid-row:1/-1;align-self:stretch;min-width:0;margin:0;padding:0;background:#252526;border:0;border-right:1px solid #37373d;border-radius:0;font:13px 'Segoe UI',system-ui,sans-serif}
+.explorer-title{height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 12px 0 19px}.library h2{margin:0;font-size:11px;font-weight:500;text-transform:uppercase}.explorer-title button{padding:1px 5px;border:0;border-radius:4px;background:transparent;font-size:17px;line-height:20px}.explorer-title button:hover{background:#39393d}
+.explorer-root{padding:4px 8px;background:#2d2d30;font-size:11px;font-weight:700}.library .tools{margin:0}.library form{padding:6px 12px 0}.library input{background:#3c3c3c;border-radius:0;border-color:#007acc;font-size:13px}
+#libraryTree{margin-top:3px}.library button.tree-folder,.library button.tree-video{display:flex;align-items:center;gap:7px;height:23px;padding:0 14px;font:inherit;border-radius:0}.library button span:last-child{overflow:hidden;text-overflow:ellipsis}.library button.tree-folder:hover,.library button.tree-video:hover{background:#2a2d2e}.library button[data-selected=true]{background:#37373d}.library button[aria-current=true]{background:#094771;color:#fff}
+.chevron{width:6px;height:6px;flex:none;border-right:1px solid;border-top:1px solid;transform:rotate(45deg);margin-right:2px}.tree-folder[aria-expanded=true] .chevron{transform:rotate(135deg) translate(-1px,1px)}.folder-icon{position:relative;width:14px;height:9px;flex:none;background:#d5a85b;border-radius:1px}.folder-icon::before{content:'';position:absolute;top:-2px;left:0;width:6px;height:3px;background:inherit;border-radius:1px}.video-icon{color:#83b7e5;font-size:15px}
+.tree-children{margin-left:17px;padding-left:0;border-color:#414145}.library .hint{margin:10px 14px;color:#999;font-size:11px}.review{grid-column:2;grid-row:2;padding:18px 22px}
+@media(max-width:680px){main{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto 1fr}header,.review,.library{grid-column:1}header{grid-row:1}.review{grid-row:2;padding:12px}.library{grid-row:3;border-top:1px solid #37373d}}
+.library input.tree-rename{display:block;width:calc(100% - 20px);height:23px;margin:0 10px;padding:0 5px}</style>
+<main>
+<header><h1>RoboCoach Video Review</h1><label class="open" for="file">Open video</label><input id="file" type="file" accept="video/*" hidden></header>
+<aside class="library" aria-label="Match library">
+<div class="explorer-title"><h2>Explorer</h2><button id="newFolder" title="New folder" aria-label="New folder">＋</button></div><div class="explorer-root">⌄ &nbsp; ROBOCOACH</div>
+<div class="tools">
+
+<form id="folderForm" hidden><input id="folderName" aria-label="New folder name" placeholder="New folder name" required maxlength="80"></form>
+</div>
+<nav id="libraryTree" aria-label="Saved match folders"></nav><p class="hint" id="saveFolder"></p>
+<p class="hint" id="libraryStatus" role="status">Videos and reviews are stored in this browser.</p>
+</aside>
+<section class="review" aria-label="Video review">
+<div class="stage"><video id="video" playsinline preload="metadata"></video><canvas id="ink" aria-label="Freehand drawing overlay"></canvas><div id="empty" class="empty">Open a match video to start.</div></div>
+<div class="tools">
+<button id="play" disabled>Play</button><div class="track"><input class="seek" id="seek" aria-label="Video position" type="range" min="0" max="0" step="any" value="0" disabled><div id="timeline" class="timeline" aria-label="Annotation markers"></div></div><output id="time">0:00 / 0:00</output>
+</div>
+<hr style="border:0;border-top:1px solid #35404d;margin:16px 0">
+<div class="tools">
+<button id="pen" aria-pressed="false" disabled>Pen</button><input id="color" type="color" aria-label="Pen color" value="#b9f47e"><button id="undo" disabled>Undo stroke</button><button id="clear" disabled>Clear frame</button><button id="note" disabled>Add note</button><select id="marks" aria-label="Jump to marked frame" disabled><option value="">Marked frames</option></select>
+</div>
+<p class="hint" id="status" role="status">Turn on the pen to pause and draw. Click a timeline dot to revisit a drawing or note. Drawings and notes save automatically to your match library.</p>
+<dialog id="noteDialog">
+<form id="noteForm">
+<label for="description" id="noteLabel">What happened?</label>
+<textarea id="description" rows="4" autofocus></textarea>
+<div class="tools"><button type="submit">Save note</button><button type="button" id="cancelNote">Close</button></div>
+</form>
+</dialog>
+</section></main>
+<script>
+const byId = id => document.getElementById(id);
+const [file, video, ink, empty, play, seek, time, pen, color, undo, clear, marks] =
+  ['file','video','ink','empty','play','seek','time','pen','color','undo','clear','marks'].map(byId);
+const context = ink.getContext('2d');
+const drawings = new Map();
+const notes = new Map();
+const timeline = byId("timeline");
+const noteDialog = byId("noteDialog");
+const description = byId("description");
+let noteTime;
+function timestamps() {
+  return [...new Set([...drawings.keys(), ...notes.keys()])].sort((a, b) => a - b);
+}
+function openNote(timestamp) {
+  video.pause();
+  noteTime = timestamp;
+  byId("noteLabel").textContent = "What happened at " + format(timestamp) + "?";
+  description.value = notes.get(timestamp) ?? "";
+  noteDialog.showModal();
+}
+let url, active, drawing = false;
+
+function format(seconds) {
+  return Math.floor(seconds / 60) + ':' + (seconds % 60).toFixed(2).padStart(5, '0');
+}
+function frame() {
+  return timestamps().find(t => Math.abs(t - video.currentTime) < 0.02) ?? video.currentTime;
+}
+function redraw() {
+  context.clearRect(0, 0, ink.width, ink.height);
+  const strokes = video.paused ? drawings.get(frame()) ?? [] : [];
+  context.lineCap = context.lineJoin = 'round';
+  context.lineWidth = Math.max(2, ink.width * 0.004);
+  for (const stroke of strokes) {
+    context.strokeStyle = context.fillStyle = stroke.color;
+    context.beginPath();
+    const first = stroke.points[0];
+    if (stroke.points.length === 1) {
+      context.arc(first.x * ink.width, first.y * ink.height, context.lineWidth / 2, 0, 2 * Math.PI);
+      context.fill();
+    } else {
+      context.moveTo(first.x * ink.width, first.y * ink.height);
+      for (const point of stroke.points.slice(1)) context.lineTo(point.x * ink.width, point.y * ink.height);
+      context.stroke();
+    }
+  }
+  undo.disabled = clear.disabled = !strokes.length;
+}
+function layout() {
+  if (!video.videoWidth) return;
+  const scale = Math.min(video.clientWidth / video.videoWidth, video.clientHeight / video.videoHeight);
+  const width = video.videoWidth * scale, height = video.videoHeight * scale;
+  Object.assign(ink.style, {
+    width: width + 'px', height: height + 'px',
+    left: (video.clientWidth - width) / 2 + 'px',
+    top: (video.clientHeight - height) / 2 + 'px'
+  });
+  ink.width = Math.round(width * devicePixelRatio);
+  ink.height = Math.round(height * devicePixelRatio);
+  redraw();
+}
+function updateMarks() {
+  marks.replaceChildren(new Option('Marked frames', ''));
+  timeline.replaceChildren();
+  for (const t of timestamps()) {
+    marks.add(new Option(format(t), t));
+    const dot = document.createElement('button');
+    dot.type = 'button';
+    dot.className = 'marker';
+    dot.style.left = (100 * t / (video.duration || 1)) + '%';
+    dot.title = format(t) + (notes.has(t) ? ' — ' + notes.get(t) : ' — Drawing');
+    dot.setAttribute('aria-label', dot.title);
+    dot.onclick = () => {
+      video.pause();
+      video.currentTime = t;
+      if (notes.has(t)) openNote(t);
+    };
+    timeline.append(dot);
+  }
+  marks.disabled = !timestamps().length;
+}
+function setPen(on) {
+  drawing = on;
+  pen.setAttribute('aria-pressed', String(on));
+  ink.classList.toggle('drawing', on);
+  if (on) video.pause();
+}
+const libraryTree = byId('libraryTree');
+const expanded = new Set(['Unfiled']);
+let selectedFolder = 'Unfiled';
+let switching = false;
+let savedFolders = [], savedMatches = [];
+const libraryStatus = byId('libraryStatus');
+let currentMatch;
+const database = new Promise((resolve, reject) => {
+  const request = indexedDB.open('RoboCoachLibrary', 1);
+  request.onupgradeneeded = () => {
+    request.result.createObjectStore('folders', {keyPath: 'name'});
+    request.result.createObjectStore('matches', {keyPath: 'id'});
+    request.result.createObjectStore('videos');
+    request.result.createObjectStore('annotations');
+  };
+  request.onsuccess = () => resolve(request.result);
+  request.onerror = () => reject(request.error);
+});
+function storageError(error) {
+  libraryStatus.textContent = 'Could not save or open library data. Check browser storage and available space.';
+  console.error(error);
+}
+async function read(store, operation, key) {
+  const db = await database;
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(store).objectStore(store)[operation](key);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+async function write(records) {
+  const db = await database;
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction([...new Set(records.map(record => record[0]))], 'readwrite');
+    tx.oncomplete = resolve;
+    tx.onabort = () => reject(tx.error);
+    for (const [store, value, key] of records) {
+      const target = tx.objectStore(store);
+      if (value === undefined) {
+        target.delete(key);
+        continue;
+      }
+      if (key === undefined) target.put(value);
+      else target.put(value, key);
+    }
+  });
+}
+let pendingSave = Promise.resolve();
+function saveAnnotations() {
+  if (!currentMatch) return;
+  const id = currentMatch.id;
+  const review = structuredClone({drawings: [...drawings], notes: [...notes]});
+  pendingSave = pendingSave.then(async () => {
+    await write([['annotations', review, id]]);
+    libraryStatus.textContent = 'Review saved in this browser.';
+  }).catch(storageError);
+}
+function bindExplorerRow(row, activate, name, rename) {
+  let clickTimer;
+  row.onclick = event => {
+    if (!rename || event.detail === 0) {
+      activate();
+      return;
+    }
+    clearTimeout(clickTimer);
+    if (event.detail === 1) clickTimer = setTimeout(activate, 500);
+  };
+  if (!rename) return;
+  function edit() {
+    clearTimeout(clickTimer);
+    const input = document.createElement('input');
+    input.className = 'tree-rename';
+    input.setAttribute('aria-label', 'Rename ' + name);
+    input.value = name;
+    row.replaceWith(input);
+    input.focus();
+    input.select();
+    input.onkeydown = async event => {
+      if (event.key === 'Escape') {
+        input.replaceWith(row);
+        row.focus();
+        return;
+      }
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      const next = input.value.trim();
+      if (!next || next === name) {
+        input.replaceWith(row);
+        row.focus();
+        return;
+      }
+      input.disabled = true;
+      try {
+        await rename(next);
+        await refreshLibrary();
+      } catch (error) {
+        libraryStatus.textContent = error.message || 'Could not rename this item.';
+        input.disabled = false;
+        input.focus();
+      }
+    };
+  }
+  row.ondblclick = edit;
+  row.oncontextmenu = event => {
+    event.preventDefault();
+    edit();
+  };
+  row.onkeydown = event => {
+    if (event.key === 'F2') {
+      event.preventDefault();
+      edit();
+    }
+  };
+}
+async function renameFolder(name, next) {
+  if (name === 'Unfiled' && next === 'Unfiled') {
+    await write([['folders', undefined, name]]);
+    return;
+  }
+  if (next === 'Unfiled' || savedFolders.some(folder => folder.name === next || folder.label === next)) {
+    throw new Error('A folder with that name already exists.');
+  }
+  if (name === 'Unfiled') {
+    await write([['folders', {name, label: next}]]);
+    return;
+  }
+  const matches = savedMatches.filter(match => match.folder === name);
+  await write([
+    ['folders', {name: next}],
+    ['folders', undefined, name],
+    ...matches.map(match => ['matches', {...match, folder: next}])
+  ]);
+  if (expanded.delete(name)) expanded.add(next);
+  if (selectedFolder === name) selectedFolder = next;
+  if (currentMatch?.folder === name) currentMatch.folder = next;
+}
+function folderLabel(name) {
+  return savedFolders.find(folder => folder.name === name)?.label ?? name;
+}
+function renderLibrary() {
+  libraryTree.replaceChildren();
+  byId('saveFolder').textContent = 'Import into ' + folderLabel(selectedFolder);
+  for (const name of ['Unfiled', ...savedFolders.filter(folder => folder.name !== 'Unfiled').map(folder => folder.name)]) {
+    const open = expanded.has(name);
+    const folder = document.createElement('button');
+    folder.className = 'tree-folder';
+    folder.setAttribute('aria-expanded', String(open));
+    folder.dataset.selected = String(name === selectedFolder);
+    folder.innerHTML = '<span class="chevron" aria-hidden="true"></span><span class="folder-icon" aria-hidden="true"></span><span></span>';
+    folder.lastElementChild.textContent = folderLabel(name);
+    bindExplorerRow(folder, () => {
+      selectedFolder = name;
+      if (open) expanded.delete(name);
+      else expanded.add(name);
+      renderLibrary();
+      [...libraryTree.querySelectorAll('.tree-folder')].find(row => row.dataset.selected === 'true')?.focus();
+    }, folderLabel(name), next => renameFolder(name, next));
+    libraryTree.append(folder);
+    if (!open) continue;
+    const children = document.createElement('div');
+    children.className = 'tree-children';
+    for (const match of savedMatches.filter(item => item.folder === name)) {
+      const row = document.createElement('button');
+      row.className = 'tree-video';
+      row.innerHTML = '<span class="video-icon" aria-hidden="true">▷</span><span></span>';
+      row.lastElementChild.textContent = match.name;
+      row.title = match.name;
+      if (match.id === currentMatch?.id) row.setAttribute('aria-current', 'true');
+      bindExplorerRow(row, () => openSavedMatch(match), match.name, async name => {
+        await write([['matches', {...match, name}]]);
+        if (currentMatch?.id === match.id) currentMatch.name = name;
+      });
+      children.append(row);
+    }
+    if (!children.childElementCount) children.textContent = 'No videos yet';
+    libraryTree.append(children);
+  }
+}
+async function refreshLibrary() {
+  [savedFolders, savedMatches] = await Promise.all([
+    read('folders', 'getAll'), read('matches', 'getAll')
+  ]);
+  renderLibrary();
+}
+refreshLibrary().catch(storageError);
+byId('newFolder').onclick = () => {
+  const form = byId('folderForm');
+  form.hidden = !form.hidden;
+  if (!form.hidden) byId('folderName').focus();
+};
+byId('folderName').onkeydown = event => {
+  if (event.key === 'Escape') {
+    byId('folderForm').hidden = true;
+    byId('newFolder').focus();
+  }
+};
+byId('folderForm').onsubmit = async event => {
+  event.preventDefault();
+  const input = byId('folderName');
+  const name = input.value.trim();
+  if (!name) return;
+  try {
+    if (savedFolders.some(folder => folder.label === name)) {
+      libraryStatus.textContent = 'A folder with that name already exists.';
+      return;
+    }
+    if (name !== 'Unfiled') await write([['folders', {name}]]);
+    selectedFolder = name;
+    expanded.add(name);
+    await refreshLibrary();
+    input.value = '';
+    byId('folderForm').hidden = true;
+    byId('newFolder').focus();
+  } catch (error) { storageError(error); }
+};
+function loadMatch(match, blob, review) {
+  video.pause();
+  if (url) URL.revokeObjectURL(url);
+  currentMatch = match;
+  drawings.clear();
+  notes.clear();
+  for (const [t, strokes] of review?.drawings ?? []) drawings.set(t, strokes);
+  for (const [t, text] of review?.notes ?? []) notes.set(t, text);
+  active = undefined;
+  timeline.replaceChildren();
+  marks.disabled = true;
+  setPen(false);
+  byId('note').disabled = play.disabled = seek.disabled = pen.disabled = true;
+  empty.hidden = false;
+  empty.textContent = 'Loading video…';
+  context.clearRect(0, 0, ink.width, ink.height);
+  url = URL.createObjectURL(blob);
+  video.src = url;
+}
+async function changeMatch(action) {
+  if (switching) return;
+  switching = file.disabled = true;
+  try {
+    await action();
+  } catch (error) { storageError(error); }
+  finally {
+    switching = file.disabled = false;
+  }
+}
+file.onchange = () => {
+  const blob = file.files[0];
+  if (!blob) return;
+  const match = {id: crypto.randomUUID(), name: blob.name, folder: selectedFolder};
+  file.value = '';
+  return changeMatch(async () => {
+    await write([['matches', match], ['videos', blob, match.id]]);
+    loadMatch(match, blob);
+    expanded.add(match.folder);
+    await refreshLibrary();
+    libraryStatus.textContent = 'Video saved in ' + folderLabel(match.folder) + '.';
+  });
+};
+function openSavedMatch(match) {
+  const id = match.id;
+  return changeMatch(async () => {
+    const blob = await read('videos', 'get', id);
+    await pendingSave;
+    const review = await read('annotations', 'get', id);
+    selectedFolder = match.folder;
+    loadMatch(match, blob, review);
+    renderLibrary();
+  });
+}
+video.onloadedmetadata = () => {
+  empty.hidden = true;
+  byId("note").disabled = play.disabled = seek.disabled = pen.disabled = false;
+  seek.max = video.duration;
+  updateMarks();
+  layout();
+  sync();
+};
+video.onerror = () => {
+  empty.hidden = false;
+  empty.textContent = 'Could not open this video. Try an MP4 or WebM your browser supports.';
+};
+function sync() {
+  seek.value = video.currentTime;
+  time.value = format(video.currentTime) + ' / ' + format(video.duration || 0);
+  play.textContent = video.paused ? 'Play' : 'Pause';
+  redraw();
+}
+for (const event of ['timeupdate','play','pause','seeked','ended']) video.addEventListener(event, sync);
+new ResizeObserver(layout).observe(video);
+play.onclick = async () => {
+  if (video.paused) {
+    setPen(false);
+    try { await video.play(); }
+    catch { byId('status').textContent = 'The browser could not play this video.'; }
+  } else video.pause();
+};
+seek.oninput = () => { video.currentTime = Number(seek.value); };
+pen.onclick = () => setPen(!drawing);
+marks.onchange = () => {
+  if (marks.value === '') return;
+  video.pause();
+  video.currentTime = Number(marks.value);
+  marks.value = '';
+};
+byId('note').onclick = () => openNote(frame());
+byId('cancelNote').onclick = () => noteDialog.close();
+byId('noteForm').onsubmit = event => {
+  event.preventDefault();
+  const text = description.value.trim();
+  if (text) notes.set(noteTime, text);
+  else notes.delete(noteTime);
+  updateMarks();
+  saveAnnotations();
+  noteDialog.close();
+};
+function point(event) {
+  const rect = ink.getBoundingClientRect();
+  return {
+    x: Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)),
+    y: Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height))
+  };
+}
+ink.onpointerdown = event => {
+  if (!drawing || active || event.button !== 0) return;
+  const timestamp = frame();
+  const strokes = drawings.get(timestamp) ?? [];
+  const stroke = {color: color.value, points: [point(event)]};
+  strokes.push(stroke);
+  drawings.set(timestamp, strokes);
+  active = {id: event.pointerId, stroke};
+  ink.setPointerCapture(event.pointerId);
+  redraw();
+};
+ink.onpointermove = event => {
+  if (active?.id !== event.pointerId) return;
+  active.stroke.points.push(point(event));
+  redraw();
+};
+ink.onlostpointercapture = event => {
+  if (active?.id !== event.pointerId) return;
+  active = undefined;
+  updateMarks();
+  saveAnnotations();
+};
+undo.onclick = () => {
+  const timestamp = frame();
+  const strokes = drawings.get(timestamp);
+  strokes?.pop();
+  if (!strokes?.length) drawings.delete(timestamp);
+  updateMarks();
+  saveAnnotations();
+  redraw();
+};
+clear.onclick = () => {
+  drawings.delete(frame());
+  updateMarks();
+  saveAnnotations();
+  redraw();
+};
+</script>
+</html>
+
+
+
+
+
+
+
+
+
+
