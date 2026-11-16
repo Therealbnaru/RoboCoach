@@ -37,7 +37,7 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 .review-expanded .review-divider{display:none}
 .review-expanded #status{grid-area:3/1/4/-1;margin:0}
 @media(max-width:540px){#videoReview.review-expanded{grid-template-columns:90px minmax(0,1fr);padding:6px;gap:6px}.review-expanded .annotation-tools{padding:5px}.review-expanded .annotation-tools button{padding:6px;font-size:13px}.review-expanded .playback-tools .track{min-width:65px}}
-.volume-control{display:flex;align-items:center;gap:6px;font-size:13px}.volume-control input{width:84px;accent-color:#b9f47e}main.scouting-active #profile{grid-column:1;grid-row:2}canvas.drawing.erasing{cursor:cell}</style>
+.volume-control{display:flex;align-items:center;gap:6px;font-size:13px}.volume-control input{width:84px;accent-color:#b9f47e}main.scouting-active #profile{grid-column:1;grid-row:2}canvas.drawing.erasing{cursor:cell}.auto-select{padding:8px;border:1px solid #56565e;border-radius:5px}.auto-select summary{cursor:pointer}.auto-select div{max-height:170px;overflow:auto}.scout-form .auto-select label{display:flex;align-items:center;padding:5px 0}.scout-form .auto-select input{width:auto}</style>
 <main>
 <header><nav class="tools" aria-label="RoboCoach views"><button id="reviewView" aria-pressed="true">Video Review</button><button id="scoutView" aria-pressed="false">Scouting View</button><button id="profileView" aria-pressed="false">Profile</button></nav><label class="open" for="file">Open video</label><input id="file" type="file" accept="video/*" multiple hidden></header>
 <aside class="library" aria-label="Match library">
@@ -73,7 +73,7 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 <label>Entry type<select name="kind"><option>Match observation</option><option>Pit interview</option></select></label>
 <label>Team number<input name="team" required maxlength="30"></label>
 <label>Event<select name="event"><option value="">No event</option></select><input id="newScoutEvent" aria-label="New event name" placeholder="New event name" maxlength="100" hidden></label>
-<label>Scout<input name="scout" maxlength="80"></label>
+<label>Scout<input name="scout" maxlength="80"></label><label>Robot type<input name="robotType" maxlength="100"></label>
 <label id="matchFields">Match # / alliance color<input name="match"></label>
 <label>Scoring / 10<input name="scoring" type="number" min="1" max="10" step="1"></label>
 <label>Game sense / driving / 10<input name="driving" type="number" min="1" max="10" step="1"></label>
@@ -81,6 +81,8 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 <label>Compatibility / 10<input name="compatibility" type="number" min="1" max="10" step="1"></label>
 <label class="wide">Notes<textarea name="notes" rows="3"></textarea></label>
 
+<details class="auto-select"><summary>Autos to run with them</summary><div id="autosWith"></div></details>
+<details class="auto-select"><summary>Autos to run against them</summary><div id="autosAgainst"></div></details>
 <div class="tools wide"><button type="submit" id="saveScout">Save entry</button><button type="button" id="resetScout" hidden>Cancel edit</button></div>
 </form>
 <section class="route-planner" id="scoutPlanner" aria-label="Field path planner">
@@ -111,8 +113,7 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 <div class="scout-workspace" id="profileWorkspace"><form class="scout-form" id="profileForm">
 <label>Team number<input name="team" maxlength="30"></label>
 <label>Team name<input name="teamName" maxlength="100"></label>
-<label>Robot name<input name="robot" maxlength="100"></label>
-<label>Drivetrain<input name="drivetrain" maxlength="100"></label>
+<label>Robot type<input name="robotType" maxlength="100"></label>
 <label class="wide">Autonomous routines<textarea name="autonomous" rows="3"></textarea></label>
 <label class="wide">Scoring strengths and preferred alliance role<textarea name="strengths" rows="3"></textarea></label>
 <label class="wide">Notes<textarea name="notes" rows="3"></textarea></label>
@@ -803,6 +804,7 @@ function showView(view) {
   }
   if (view !== 'review') video.pause();
   if (view === 'scout') {
+    renderAutoChoices();
     refreshScouting().catch(reportScoutError);
     renderRouteTabs();
   }
@@ -843,6 +845,7 @@ profileForm.onsubmit = event => {
     const profile = Object.fromEntries(new FormData(profileForm));
     profile.autonRoutes = plannerView === 'profile' ? scoutRoutes : plannerDrafts.profile.routes;
     localStorage.setItem('robocoach.profile', JSON.stringify(profile));
+    savedProfileRoutes = structuredClone(profile.autonRoutes);
     profileStatus.textContent = 'Profile saved in this browser.';
   } catch {
     profileStatus.textContent = 'Could not save the profile. Check browser storage.';
@@ -855,11 +858,40 @@ function updateScoutFields() {
 }
 scoutForm.elements.kind.onchange = updateScoutFields;
 updateScoutFields();
+const autoFields = {autosWith: 'Autos to run with them', autosAgainst: 'Autos to run against them'};
+function selectedAutos(id) {
+  return [...byId(id).querySelectorAll('input:checked')].map(input => input.value);
+}
+function cleanAutos(value) {
+  return Array.isArray(value) ? [...new Set(value.filter(item => typeof item === 'string' && item.trim()).map(item => item.slice(0, 128)))] : [];
+}
+function renderAutoChoices(entry) {
+  const choices = normalizeScoutRoutes(savedProfileRoutes)
+    .filter(route => route.name || route.color || route.strokes.length || route.file)
+    .map(route => routeTitle(route) + ' (Route ' + route.number + ')');
+  for (const id of Object.keys(autoFields)) {
+    const picked = entry ? cleanAutos(entry[id]) : selectedAutos(id);
+    const group = byId(id);
+    group.replaceChildren();
+    const options = [...new Set([...choices, ...picked])];
+    if (!options.length) group.textContent = 'Save an auto in Profile to choose it here.';
+    for (const title of options) {
+      const label = document.createElement('label');
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.value = title;
+      box.checked = picked.includes(title);
+      label.append(box, document.createTextNode(title));
+      group.append(label);
+    }
+  }
+}
 function resetScoutForm() {
   editingScoutId = undefined;
   const {event, scout} = scoutForm.elements;
   const context = [event.value, scout.value];
   scoutForm.reset();
+  renderAutoChoices({});
   setScoutRoutes();
 
   [event.value, scout.value] = context;
@@ -939,6 +971,7 @@ function renderScoutRows() {
       edit.onclick = () => {
         editingScoutId = entry.id;
         setScoutRoutes(entry.autonRoutes);
+        renderAutoChoices(entry);
 
         for (const control of scoutControls) control.value = scoutRating(entry, control.name);
         newEvent.hidden = true;
@@ -948,6 +981,13 @@ function renderScoutRows() {
         scoutForm.elements.team.focus();
       };
       details.append(info);
+      for (const [id, title] of Object.entries(autoFields)) {
+        const picked = cleanAutos(entry[id]);
+        if (!picked.length) continue;
+        const line = document.createElement('p');
+        line.textContent = title + ': ' + picked.join(', ');
+        details.append(line);
+      }
       if (entry.route?.length) {
         const preview = document.createElement('canvas');
         preview.width = preview.height = 720;
@@ -1031,6 +1071,7 @@ scoutForm.onsubmit = async event => {
   }
   const previous = scoutingEntries.find(item => item.id === editingScoutId);
   entry.autonRoutes = structuredClone(scoutRoutes);
+  for (const id of Object.keys(autoFields)) entry[id] = selectedAutos(id);
   entry.id = editingScoutId ?? crypto.randomUUID();
     if (await saveScoutEntries([{...previous, ...entry, match: entry.match ?? ''}], 'Saved entry for ' + entry.team + '.')) {
     eventInput.value = entry.event;
@@ -1080,6 +1121,7 @@ byId('importScout').onchange = async event => {
       if (entry.kind === 'Pit interview') delete entry.points;
       entry.route = validateRoute(item.route);
       entry.autonRoutes = normalizeScoutRoutes(item.autonRoutes);
+      for (const id of Object.keys(autoFields)) entry[id] = cleanAutos(item[id]);
       entries.push(entry);
     }
     await saveScoutEntries(entries, 'Imported ' + entries.length + ' new entries.');
@@ -1347,6 +1389,7 @@ function drawField(canvas, strokes, overlay = false) {
 }
 </script>
 </html>
+
 
 
 
