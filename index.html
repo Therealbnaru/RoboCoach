@@ -27,7 +27,17 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 @media(max-width:680px){main{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto 1fr}header,.review,.library{grid-column:1}header{grid-row:1}.review{grid-row:2;padding:12px}.library{grid-row:3;border-top:1px solid #37373d}}
 .library input.tree-rename{display:block;width:calc(100% - 20px);height:23px;margin:0 10px;padding:0 5px}.folder-heading{display:flex;align-items:center}.folder-heading .tree-folder,.folder-heading .tree-rename{flex:1;min-width:0}.library .remove-folder{flex:none;padding:0 9px;border:0;background:transparent;color:#bbb;font-size:17px;line-height:23px}.library .remove-folder:hover{color:white;background:#733838}.folder-heading.drop-target{outline:1px solid #60aaff;outline-offset:-1px;background:#094771}.tree-video[draggable=true]{cursor:grab}.scout-form,.scout-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.scout-form{max-width:850px;margin:16px 0}.scout-fields,.scout-form .wide{grid-column:1/-1}.scout-form label{display:grid;gap:4px;font-size:13px}.scout-form input,.scout-form select,.scout-form textarea,.scout-actions select{width:100%;min-width:0;padding:7px;color:inherit;background:#252526;border:1px solid #56565e;border-radius:4px;font:inherit;margin:0}.scout-actions select{width:auto}.scout-results{overflow:auto}.scout-results table{border-collapse:collapse;width:100%;text-align:left}.scout-results th,.scout-results td{padding:9px;border-bottom:1px solid #46464b;vertical-align:top}.scout-results details{min-width:135px}.scout-results p{white-space:pre-wrap}.scout-results button{padding:4px 8px}.scout-actions{margin-top:24px}main.scouting-active .library{display:none}main.scouting-active{grid-template-columns:minmax(0,1fr)}main.scouting-active header,main.scouting-active #scouting{grid-column:1}
 .route-planner{border:1px solid #465363;border-radius:8px;padding:12px}.route-planner summary{cursor:pointer}.route-planner canvas{display:block;width:min(100%,480px);height:auto;touch-action:none;cursor:crosshair;margin:10px 0;border-radius:6px}.route-preview{display:block;width:min(100%,250px);height:auto;margin:8px 0}.route-planner iframe{display:block;width:100%;height:min(850px,85vh);min-height:440px;border:1px solid #465363;border-radius:6px}.route-planner a{color:#83b7e5}.scout-form{max-width:1150px}.scout-results canvas.route-preview{position:static}.scout-workspace{display:grid;grid-template-columns:minmax(300px,2fr) minmax(0,3fr);gap:22px;align-items:start}.scout-workspace .scout-form{margin-top:0}#scouting>h1{margin-bottom:16px}.route-planner{min-width:0}.route-planner h2{font-size:15px;margin:0 0 12px}.route-fields{margin-top:12px}#routeFrames{margin-top:12px}.route-fields input,.route-fields select{background:#252526;border:1px solid #56565e;border-radius:4px;color:inherit;padding:6px;font:inherit}#routeTabs button{max-width:100%;overflow-wrap:anywhere}@media(max-width:900px){.scout-workspace{grid-template-columns:minmax(0,1fr)}}
-.scout-field{position:relative;max-width:780px;margin:10px auto;background:#404850;aspect-ratio:1}.scout-field img,.scout-field canvas{position:absolute;inset:0;display:block;width:100%;height:100%}.scout-field canvas{margin:0;pointer-events:auto;touch-action:none;cursor:crosshair}.field-editor{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;margin:10px 0}.field-editor .scout-field{width:100%;margin:0 auto}.field-tools{display:flex;flex-direction:column;gap:6px}.field-tools button{padding:6px;font-size:11px;min-width:44px}.field-tools span{display:block;font-size:20px;line-height:1.25}.scout-field canvas[data-tool=move]{cursor:grab}.scout-field canvas[data-tool=move]:active{cursor:grabbing}.video-row{display:flex;align-items:center}.video-row .tree-video,.video-row .tree-rename{flex:1;min-width:0}.library .remove-folder{opacity:0}.folder-heading:hover>.remove-folder,.video-row:hover>.remove-folder,.folder-heading:focus-within>.remove-folder,.video-row:focus-within>.remove-folder{opacity:1}@media(hover:none){.library .remove-folder{opacity:1}}</style>
+.scout-field{position:relative;max-width:780px;margin:10px auto;background:#404850;aspect-ratio:1}.scout-field img,.scout-field canvas{position:absolute;inset:0;display:block;width:100%;height:100%}.scout-field canvas{margin:0;pointer-events:auto;touch-action:none;cursor:crosshair}.field-editor{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;margin:10px 0}.field-editor .scout-field{width:100%;margin:0 auto}.field-tools{display:flex;flex-direction:column;gap:6px}.field-tools button{padding:6px;font-size:11px;min-width:44px}.field-tools span{display:block;font-size:20px;line-height:1.25}.scout-field canvas[data-tool=move]{cursor:grab}.scout-field canvas[data-tool=move]:active{cursor:grabbing}.video-row{display:flex;align-items:center}.video-row .tree-video,.video-row .tree-rename{flex:1;min-width:0}.library .remove-folder{opacity:0}.folder-heading:hover>.remove-folder,.video-row:hover>.remove-folder,.folder-heading:focus-within>.remove-folder,.video-row:focus-within>.remove-folder{opacity:1}@media(hover:none){.library .remove-folder{opacity:1}}#videoReview.review-expanded{display:grid;grid-template-columns:minmax(106px,155px) minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto auto;gap:10px;background:#16191e;padding:12px;overflow:auto}
+#videoReview.review-expanded:not(:fullscreen){position:fixed;inset:0;z-index:100}
+.review-expanded .stage{grid-area:1/2;margin:0;min-height:0}
+.review-expanded .stage video{height:100%}
+.review-expanded .playback-tools{grid-area:2/2}
+.review-expanded .annotation-tools{grid-area:1/1/3;align-content:start;align-items:stretch;flex-direction:column;flex-wrap:nowrap;padding:8px;background:#252526;border-radius:8px}
+.review-expanded .annotation-tools select{width:100%;min-width:0}
+.review-expanded .review-divider{display:none}
+.review-expanded #status{grid-area:3/1/4/-1;margin:0}
+@media(max-width:540px){#videoReview.review-expanded{grid-template-columns:90px minmax(0,1fr);padding:6px;gap:6px}.review-expanded .annotation-tools{padding:5px}.review-expanded .annotation-tools button{padding:6px;font-size:13px}.review-expanded .playback-tools .track{min-width:65px}}
+</style>
 <main>
 <header><nav class="tools" aria-label="RoboCoach views"><button id="reviewView" aria-pressed="true">Video Review</button><button id="scoutView" aria-pressed="false">Scouting View</button></nav><label class="open" for="file">Open video</label><input id="file" type="file" accept="video/*" multiple hidden></header>
 <aside class="library" aria-label="Match library">
@@ -39,13 +49,13 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 <nav id="libraryTree" aria-label="Saved match folders"></nav><p class="hint" id="saveFolder"></p>
 <p class="hint" id="libraryStatus" role="status">Videos and reviews are stored in this browser.</p>
 </aside>
-<section class="review" aria-label="Video review">
+<section class="review" id="videoReview" aria-label="Video review">
 <div class="stage"><video id="video" playsinline preload="metadata"></video><canvas id="ink" aria-label="Freehand drawing overlay"></canvas><div id="empty" class="empty">Open a match video to start.</div></div>
-<div class="tools">
-<button id="play" disabled>Play</button><div class="track"><input class="seek" id="seek" aria-label="Video position" type="range" min="0" max="0" step="any" value="0" disabled><div id="timeline" class="timeline" aria-label="Annotation markers"></div></div><output id="time">0:00 / 0:00</output>
+<div class="tools playback-tools">
+<button id="play" disabled>Play</button><div class="track"><input class="seek" id="seek" aria-label="Video position" type="range" min="0" max="0" step="any" value="0" disabled><div id="timeline" class="timeline" aria-label="Annotation markers"></div></div><output id="time">0:00 / 0:00</output><button id="fullscreenReview" type="button" aria-pressed="false">Fullscreen</button>
 </div>
-<hr style="border:0;border-top:1px solid #35404d;margin:16px 0">
-<div class="tools">
+<hr class="review-divider" style="border:0;border-top:1px solid #35404d;margin:16px 0">
+<div class="tools annotation-tools" role="group" aria-label="Annotations">
 <button id="pen" aria-pressed="false" disabled>Pen</button><input id="color" type="color" aria-label="Pen color" value="#b9f47e"><button id="undo" disabled>Undo stroke</button><button id="clear" disabled>Clear frame</button><button id="note" disabled>Add note</button><select id="marks" aria-label="Jump to marked frame" disabled><option value="">Marked frames</option></select>
 </div>
 <p class="hint" id="status" role="status">Turn on the pen to pause and draw. Click a timeline dot to revisit a drawing or note. Drawings and notes save automatically to your match library.</p>
@@ -601,6 +611,34 @@ function sync() {
 }
 for (const event of ['timeupdate','play','pause','seeked','ended']) video.addEventListener(event, sync);
 new ResizeObserver(layout).observe(video);
+
+const videoReview = byId('videoReview');
+const fullscreenReview = byId('fullscreenReview');
+function setReviewExpanded(expanded) {
+  videoReview.classList.toggle('review-expanded', expanded);
+  fullscreenReview.textContent = expanded ? 'Exit fullscreen' : 'Fullscreen';
+  fullscreenReview.setAttribute('aria-pressed', String(expanded));
+}
+fullscreenReview.onclick = async () => {
+  if (videoReview.classList.contains('review-expanded')) {
+    if (document.fullscreenElement === videoReview) await document.exitFullscreen();
+    else setReviewExpanded(false);
+    return;
+  }
+  setReviewExpanded(true);
+  try {
+    if (videoReview.requestFullscreen) await videoReview.requestFullscreen();
+  } catch {
+    // Keep the viewport layout when the browser cannot enter native fullscreen.
+  }
+};
+document.addEventListener('fullscreenchange', () => {
+  setReviewExpanded(document.fullscreenElement === videoReview);
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && !document.fullscreenElement && !noteDialog.open &&
+      videoReview.classList.contains('review-expanded')) setReviewExpanded(false);
+});
 play.onclick = async () => {
   if (video.paused) {
     setPen(false);
@@ -1172,6 +1210,7 @@ function drawField(canvas, strokes, overlay = false) {
 }
 </script>
 </html>
+
 
 
 
