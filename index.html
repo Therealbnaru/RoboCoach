@@ -101,12 +101,14 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 </section></div>
 <div class="tools scout-actions">
 <label>Event <select id="scoutEvent"></select></label>
-<label>Sort teams by <select id="scoutSort"><option value="autonomous">Average autonomous</option><option value="scoring">Average scoring</option><option value="driving">Average game sense / driving</option><option value="compatibility">Average compatibility</option><option value="team">Team number</option></select></label>
+<label>Sort teams by <select id="scoutSort"><option value="autonomous">Average autonomous</option><option value="scoring">Average scoring</option><option value="driving">Average game sense / driving</option><option value="compatibility">Average compatibility</option><option value="skillsRank">World Skills rank</option><option value="team">Team number</option></select></label>
+<label class="open" for="importSkills">Import World Skills CSV</label><input id="importSkills" type="file" accept=".csv,text/csv" hidden>
+<a style="color:#83b7e5" href="https://events.vex.com/robot-competitions/vex-robotics-competition/standings/skills" target="_blank" rel="noopener">Get official standings</a>
 <button id="exportScout">Export entries</button>
 <label class="open" for="importScout">Import entries</label><input id="importScout" type="file" accept=".json,application/json" hidden>
 </div>
 <p id="scoutStatus" class="hint" role="status">Entries are saved in this browser. Use export and import to combine scouts’ entries across devices.</p>
-<div class="scout-results"><table><thead><tr><th>Team</th><th>Scoring / 10</th><th>Driving / 10</th><th>Autonomous / 10</th><th>Compatibility / 10</th><th>Entries</th></tr></thead><tbody id="scoutRows"></tbody></table></div>
+<div class="scout-results"><table><thead><tr><th>Team</th><th>Scoring / 10</th><th>Driving / 10</th><th>Autonomous / 10</th><th>Compatibility / 10</th><th>World Skills rank</th><th>Entries</th></tr></thead><tbody id="scoutRows"></tbody></table></div>
 </section>
 <section class="review" id="profile" hidden aria-labelledby="profileTitle">
 <h1 id="profileTitle">Robot Profile</h1>
@@ -924,6 +926,62 @@ function average(entries, key) {
   const values = entries.map(entry => scoutRating(entry, key)).filter(value => value !== '' && value != null).map(Number);
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
 }
+const skillsStorageKey = 'robocoach.worldSkills';
+let skillsRanks = new Map();
+try {
+  skillsRanks = new Map(JSON.parse(localStorage.getItem(skillsStorageKey) || '[]'));
+} catch {}
+function parseSkillsCsv(source) {
+  const rows = [];
+  let row = [], field = '', quoted = false;
+  for (let index = 0; index < source.length; index++) {
+    const char = source[index];
+    if (char === '"') {
+      if (quoted && source[index + 1] === '"') {
+        field += '"';
+        index++;
+      } else quoted = !quoted;
+    } else if (!quoted && char === ',') {
+      row.push(field);
+      field = '';
+    } else if (!quoted && (char === '\n' || char === '\r')) {
+      if (char === '\r' && source[index + 1] === '\n') index++;
+      rows.push([...row, field]);
+      row = [];
+      field = '';
+    } else field += char;
+  }
+  if (quoted) throw new Error('The CSV contains an unfinished quoted field.');
+  if (row.length || field) rows.push([...row, field]);
+  const header = rows.shift()?.map(value => value.trim().toLowerCase()) ?? [];
+  const rankColumn = header.indexOf('rank');
+  const teamColumn = header.indexOf('team number');
+  if (rankColumn < 0 || teamColumn < 0) throw new Error('Choose a VEX World Skills CSV with Rank and Team Number columns.');
+  const ranks = new Map();
+  for (const cells of rows) {
+    const team = cells[teamColumn]?.trim().toUpperCase();
+    const rank = Number(cells[rankColumn]);
+    if (team && Number.isSafeInteger(rank) && rank > 0) {
+      if (ranks.has(team) && ranks.get(team) !== rank) throw new Error('The CSV lists different ranks for ' + team + '.');
+      ranks.set(team, rank);
+    }
+  }
+  if (!ranks.size) throw new Error('No ranked teams found in this CSV.');
+  return ranks;
+}
+byId('importSkills').onchange = async event => {
+  const input = event.target;
+  const file = input.files[0];
+  input.value = '';
+  if (!file) return;
+  try {
+    const ranks = parseSkillsCsv(await file.text());
+    localStorage.setItem(skillsStorageKey, JSON.stringify([...ranks]));
+    skillsRanks = ranks;
+    renderScoutRows();
+    scoutStatus.textContent = 'Imported World Skills ranks for ' + ranks.size + ' teams.';
+  } catch (error) { reportScoutError(error); }
+};
 function renderScoutRows() {
   const teams = new Map();
   for (const entry of scoutingEntries) {
@@ -932,10 +990,13 @@ function renderScoutRows() {
     teams.get(entry.team).push(entry);
   }
   const rows = [...teams].map(([team, entries]) => ({
-    team, entries, ...Object.fromEntries(ratingKeys.map(key => [key, average(entries, key)]))
+    team, entries, skillsRank: skillsRanks.get(team.trim().toUpperCase()), ...Object.fromEntries(ratingKeys.map(key => [key, average(entries, key)]))
   }));
   const sort = byId('scoutSort').value;
   rows.sort((a, b) => {
+    if (sort === 'skillsRank' && a.skillsRank !== b.skillsRank) {
+      return (a.skillsRank ?? Infinity) - (b.skillsRank ?? Infinity);
+    }
     const delta = sort === 'team' ? 0 : (b[sort] ?? -1) - (a[sort] ?? -1);
     return delta || a.team.localeCompare(b.team, undefined, {numeric: true});
   });
@@ -943,12 +1004,12 @@ function renderScoutRows() {
   body.replaceChildren();
   if (!rows.length) {
     const cell = body.insertRow().insertCell();
-    cell.colSpan = 6;
+    cell.colSpan = 7;
     cell.textContent = 'No scouting entries yet.';
   }
   for (const {team, entries, ...ratings} of rows) {
     const row = body.insertRow();
-    for (const value of [team, ...ratingKeys.map(key => ratings[key]?.toFixed(1) ?? '—')]) {
+    for (const value of [team, ...ratingKeys.map(key => ratings[key]?.toFixed(1) ?? '—'), ratings.skillsRank ? '#' + ratings.skillsRank : '—']) {
       row.insertCell().textContent = value;
     }
     const details = document.createElement('details');
