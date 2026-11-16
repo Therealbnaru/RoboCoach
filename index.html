@@ -956,6 +956,12 @@ function parseSkillsCsv(source) {
   const header = rows.shift()?.map(value => value.trim().toLowerCase()) ?? [];
   const rankColumn = header.indexOf('rank');
   const scoreColumn = header.indexOf('score');
+  const drivingColumn = header.indexOf('driver skills');
+  const programmingColumn = header.indexOf('autonomous coding skills');
+  function readScore(cells, column) {
+    const value = cells[column]?.trim();
+    return value && /^\d+$/.test(value) && Number.isSafeInteger(Number(value)) ? Number(value) : null;
+  }
   const teamColumn = header.indexOf('team number');
   if (rankColumn < 0 || teamColumn < 0) throw new Error('Choose a VEX World Skills CSV with Rank and Team Number columns.');
   const ranks = new Map();
@@ -963,10 +969,14 @@ function parseSkillsCsv(source) {
     const team = cells[teamColumn]?.trim().toUpperCase();
     const rank = Number(cells[rankColumn]);
     if (team && Number.isSafeInteger(rank) && rank > 0) {
-      const rawScore = cells[scoreColumn]?.trim();
-      const score = rawScore && /^\d+$/.test(rawScore) && Number.isSafeInteger(Number(rawScore)) ? Number(rawScore) : null;
+      const score = readScore(cells, scoreColumn);
       if (ranks.has(team) && ranks.get(team).rank !== rank) throw new Error('The CSV lists different ranks for ' + team + '.');
-      ranks.set(team, {rank, score: score ?? ranks.get(team)?.score ?? null});
+      const previous = ranks.get(team);
+      ranks.set(team, {
+        rank, score: score ?? previous?.score ?? null,
+        driving: readScore(cells, drivingColumn) ?? previous?.driving ?? null,
+        programming: readScore(cells, programmingColumn) ?? previous?.programming ?? null
+      });
     }
   }
   if (!ranks.size) throw new Error('No ranked teams found in this CSV.');
@@ -997,7 +1007,9 @@ function renderScoutRows() {
     return {
       team, entries,
       skillsRank: typeof skills === 'number' ? skills : skills?.rank,
-      skillsScore: skills?.score,
+      skillsScore: skills?.score == null ? '—' : String(skills.score) +
+        (skills.driving == null && skills.programming == null ? '' :
+          ' (' + (skills.driving ?? '—') + ' driving, ' + (skills.programming ?? '—') + ' programming)'),
       ...Object.fromEntries(ratingKeys.map(key => [key, average(entries, key)]))
     };
   });
