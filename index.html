@@ -48,7 +48,16 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
   #scoreGoals{grid-template-columns:repeat(2,minmax(0,1fr))}
   #scoreGoals fieldset:last-child{grid-column:1/-1}
 }
-#liveTabVideo.pick-toggle{cursor:crosshair}#toggleTrackingStatus:empty{display:none}#liveAnnotationName{display:block;width:100%;margin:8px 0;padding:8px;color:inherit;background:#303136;border:1px solid #56565e;border-radius:4px}</style>
+#liveTabVideo.pick-toggle{cursor:crosshair}#toggleTrackingStatus:empty{display:none}#liveAnnotationName{display:block;width:100%;margin:8px 0;padding:8px;color:inherit;background:#303136;border:1px solid #56565e;border-radius:4px}
+.toggle-tracker{padding:10px;margin:10px 0;background:#1e1e1e;border:1px solid #46464b;border-radius:6px}
+.toggle-tracker>label{display:block;font-size:13px;font-weight:600;margin-bottom:7px}
+.toggle-controls{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.toggle-controls button,.toggle-controls select,.score-auton select{font:inherit;font-size:13px;min-height:32px;padding:5px 8px}
+#scorePanel #pickToggle{background:#0e639c;border-color:#1779b5;color:white}
+#scorePanel #clearToggles{background:transparent}
+#toggleTrackingStatus{margin:8px 0 0;font-size:12px}
+.score-auton{display:flex;align-items:center;justify-content:space-between;gap:8px}
+</style>
 <main>
 <header><nav class="tools" aria-label="RoboCoach views"><button id="reviewView" aria-pressed="true">Video Review</button><button id="scoutView" aria-pressed="false">Scouting View</button><button id="profileView" aria-pressed="false">Profile</button></nav><label class="open" for="file">Open video</label><input id="file" type="file" accept="video/*" multiple hidden></header>
 <aside class="library" aria-label="Match library">
@@ -73,8 +82,17 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 <section id="scorePanel" hidden aria-label="Projected Override score">
 <strong><output id="scoreTotal" aria-live="polite"></output></strong>
 <p class="hint">Projected if the match ended here. Enter visible scoring Pin halves and settled Toggle colors.</p>
-<div id="scoreGoals"></div><div class="tools"><label>Track Toggle <select id="toggleTarget"><option value="0">Top left</option><option value="1">Top right</option><option value="2">Bottom left</option><option value="3">Bottom right</option></select></label><button type="button" id="pickToggle">Pick on video</button><button type="button" id="clearToggles">Stop auto tracking</button></div><p class="hint" id="toggleTrackingStatus" role="status"></p>
-<label>Autonomous bonus <select id="scoreAuton"><option value="">None / pending</option><option value="red">Red +12</option><option value="blue">Blue +12</option><option value="tie">Tie +6 each</option></select></label>
+<div id="scoreGoals"></div>
+<div class="toggle-tracker">
+<label for="toggleTarget">Track a Toggle</label>
+<div class="toggle-controls">
+<select id="toggleTarget"><option value="0">Left</option><option value="1">Right</option><option value="2">Top</option><option value="3">Bottom</option></select>
+<button type="button" id="pickToggle">Pick on video</button>
+<button type="button" id="clearToggles" disabled>Stop tracking</button>
+</div>
+<p class="hint" id="toggleTrackingStatus" role="status"></p>
+</div>
+<label class="score-auton">Autonomous bonus <select id="scoreAuton"><option value="">Pending / none</option><option value="red">Red +12</option><option value="blue">Blue +12</option><option value="tie">Tie +6 each</option></select></label>
 <p class="hint" id="scoreChange"></p></section>
 <dialog id="nameLiveAnnotation">
 <form id="saveLiveForm">
@@ -917,7 +935,7 @@ const scorePanel = byId('scorePanel');
 const scoreButton = byId('liveScoreButton');
 const scoreGoals = byId('scoreGoals');
 let previousScore;
-for (const title of ['Top left', 'Top right', 'Bottom left', 'Bottom right', 'Midfield']) {
+for (const title of ['Left Toggle', 'Right Toggle', 'Top Toggle', 'Bottom Toggle', 'Midfield']) {
   const midfield = title === 'Midfield';
   const area = document.createElement('fieldset');
   area.innerHTML = '<legend>' + title + '</legend>';
@@ -977,6 +995,7 @@ const trackingStatus = byId('toggleTrackingStatus');
 let pickToggleIndex;
 function stopToggleTracking() {
   trackedToggles.clear();
+  byId('clearToggles').disabled = true;
   pickToggleIndex = undefined;
   liveTabVideo.classList.remove('pick-toggle');
   trackingStatus.textContent = '';
@@ -988,6 +1007,7 @@ byId('pickToggle').onclick = () => {
     return;
   }
   pickToggleIndex = Number(byId('toggleTarget').value);
+  byId('clearToggles').disabled = false;
   liveTabVideo.classList.add('pick-toggle');
   trackingStatus.textContent = 'Click the center of the Toggle’s colored face in the feed.';
 };
@@ -1002,7 +1022,7 @@ liveTabVideo.addEventListener('click', event => {
   trackedToggles.set(pickToggleIndex, {x, y});
   pickToggleIndex = undefined;
   liveTabVideo.classList.remove('pick-toggle');
-  trackingStatus.textContent = trackedToggles.size + ' Toggle(s) tracked · Checks about every 7 seconds.';
+  trackingStatus.textContent = trackedToggles.size + ' tracked · Checks every 7 seconds';
 });
 function sampleToggleColor(x, y) {
   const width = liveTabVideo.videoWidth, height = liveTabVideo.videoHeight;
@@ -1031,7 +1051,7 @@ setInterval(() => {
     refreshLiveScore();
     trackingStatus.textContent = uncertain
       ? uncertain + ' Toggle(s) unclear · Previous color kept. Correct it manually if needed.'
-      : trackedToggles.size + ' Toggle(s) checked · Next check in about 7 seconds.';
+      : trackedToggles.size + ' tracked · Checks every 7 seconds';
   } catch {
     trackingStatus.textContent = 'Could not read the shared video frame. You can still score manually.';
   }
