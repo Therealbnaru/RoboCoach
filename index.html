@@ -108,7 +108,7 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 <label class="open" for="importScout">Import entries</label><input id="importScout" type="file" accept=".json,application/json" hidden>
 </div>
 <p id="scoutStatus" class="hint" role="status">Entries are saved in this browser. Use export and import to combine scouts’ entries across devices.</p>
-<div class="scout-results"><table><thead><tr><th>Team</th><th>Scoring / 10</th><th>Driving / 10</th><th>Autonomous / 10</th><th>Compatibility / 10</th><th>World Skills rank</th><th>Entries</th></tr></thead><tbody id="scoutRows"></tbody></table></div>
+<div class="scout-results"><table><thead><tr><th>Team</th><th>Scoring / 10</th><th>Driving / 10</th><th>Autonomous / 10</th><th>Compatibility / 10</th><th>World Skills rank</th><th>World Skills score</th><th>Entries</th></tr></thead><tbody id="scoutRows"></tbody></table></div>
 </section>
 <section class="review" id="profile" hidden aria-labelledby="profileTitle">
 <h1 id="profileTitle">Robot Profile</h1>
@@ -955,6 +955,7 @@ function parseSkillsCsv(source) {
   if (row.length || field) rows.push([...row, field]);
   const header = rows.shift()?.map(value => value.trim().toLowerCase()) ?? [];
   const rankColumn = header.indexOf('rank');
+  const scoreColumn = header.indexOf('score');
   const teamColumn = header.indexOf('team number');
   if (rankColumn < 0 || teamColumn < 0) throw new Error('Choose a VEX World Skills CSV with Rank and Team Number columns.');
   const ranks = new Map();
@@ -962,8 +963,10 @@ function parseSkillsCsv(source) {
     const team = cells[teamColumn]?.trim().toUpperCase();
     const rank = Number(cells[rankColumn]);
     if (team && Number.isSafeInteger(rank) && rank > 0) {
-      if (ranks.has(team) && ranks.get(team) !== rank) throw new Error('The CSV lists different ranks for ' + team + '.');
-      ranks.set(team, rank);
+      const rawScore = cells[scoreColumn]?.trim();
+      const score = rawScore && /^\d+$/.test(rawScore) && Number.isSafeInteger(Number(rawScore)) ? Number(rawScore) : null;
+      if (ranks.has(team) && ranks.get(team).rank !== rank) throw new Error('The CSV lists different ranks for ' + team + '.');
+      ranks.set(team, {rank, score: score ?? ranks.get(team)?.score ?? null});
     }
   }
   if (!ranks.size) throw new Error('No ranked teams found in this CSV.');
@@ -989,9 +992,15 @@ function renderScoutRows() {
     if (!teams.has(entry.team)) teams.set(entry.team, []);
     teams.get(entry.team).push(entry);
   }
-  const rows = [...teams].map(([team, entries]) => ({
-    team, entries, skillsRank: skillsRanks.get(team.trim().toUpperCase()), ...Object.fromEntries(ratingKeys.map(key => [key, average(entries, key)]))
-  }));
+  const rows = [...teams].map(([team, entries]) => {
+    const skills = skillsRanks.get(team.trim().toUpperCase());
+    return {
+      team, entries,
+      skillsRank: typeof skills === 'number' ? skills : skills?.rank,
+      skillsScore: skills?.score,
+      ...Object.fromEntries(ratingKeys.map(key => [key, average(entries, key)]))
+    };
+  });
   const sort = byId('scoutSort').value;
   rows.sort((a, b) => {
     if (sort === 'skillsRank' && a.skillsRank !== b.skillsRank) {
@@ -1004,12 +1013,12 @@ function renderScoutRows() {
   body.replaceChildren();
   if (!rows.length) {
     const cell = body.insertRow().insertCell();
-    cell.colSpan = 7;
+    cell.colSpan = 8;
     cell.textContent = 'No scouting entries yet.';
   }
   for (const {team, entries, ...ratings} of rows) {
     const row = body.insertRow();
-    for (const value of [team, ...ratingKeys.map(key => ratings[key]?.toFixed(1) ?? '—'), ratings.skillsRank ? '#' + ratings.skillsRank : '—']) {
+    for (const value of [team, ...ratingKeys.map(key => ratings[key]?.toFixed(1) ?? '—'), ratings.skillsRank ? '#' + ratings.skillsRank : '—', ratings.skillsScore ?? '—']) {
       row.insertCell().textContent = value;
     }
     const details = document.createElement('details');
