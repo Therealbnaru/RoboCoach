@@ -957,6 +957,13 @@ function renderScoutRows() {
       .sort((a, b) => (a.event ?? '').localeCompare(b.event ?? ''));
     summary.textContent = history.length + (history.length === 1 ? ' entry across all events' : ' entries across all events');
     details.append(summary);
+    const openScout = document.createElement('a');
+    openScout.href = 'https://openscout.ing/teams/V5RC/' + encodeURIComponent(team);
+    openScout.target = '_blank';
+    openScout.rel = 'noopener noreferrer';
+    openScout.style.color = '#83b7e5';
+    openScout.textContent = 'View team stats on OpenScout';
+    details.append(openScout);
     let lastEvent;
     for (const entry of history) {
       const eventName = entry.event || 'No event';
