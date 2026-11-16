@@ -48,7 +48,7 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
   #scoreGoals{grid-template-columns:repeat(2,minmax(0,1fr))}
   #scoreGoals fieldset:last-child{grid-column:1/-1}
 }
-</style>
+#liveTabVideo.pick-toggle{cursor:crosshair}#toggleTrackingStatus:empty{display:none}</style>
 <main>
 <header><nav class="tools" aria-label="RoboCoach views"><button id="reviewView" aria-pressed="true">Video Review</button><button id="scoutView" aria-pressed="false">Scouting View</button><button id="profileView" aria-pressed="false">Profile</button></nav><label class="open" for="file">Open video</label><input id="file" type="file" accept="video/*" multiple hidden></header>
 <aside class="library" aria-label="Match library">
@@ -73,7 +73,7 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 <section id="scorePanel" hidden aria-label="Projected Override score">
 <strong><output id="scoreTotal" aria-live="polite"></output></strong>
 <p class="hint">Projected if the match ended here. Enter visible scoring Pin halves and settled Toggle colors.</p>
-<div id="scoreGoals"></div>
+<div id="scoreGoals"></div><div class="tools"><label>Track Toggle <select id="toggleTarget"><option value="0">Top left</option><option value="1">Top right</option><option value="2">Bottom left</option><option value="3">Bottom right</option></select></label><button type="button" id="pickToggle">Pick on video</button><button type="button" id="clearToggles">Stop auto tracking</button></div><p class="hint" id="toggleTrackingStatus" role="status"></p>
 <label>Autonomous bonus <select id="scoreAuton"><option value="">None / pending</option><option value="red">Red +12</option><option value="blue">Blue +12</option><option value="tie">Tie +6 each</option></select></label>
 <p class="hint" id="scoreChange"></p></section>
 <dialog id="savedLiveDialog" aria-label="Saved live annotation">
@@ -964,6 +964,73 @@ function resetLiveScore() {
 }
 scoreButton.onclick = () => showLiveScore(scorePanel.hidden);
 scorePanel.oninput = refreshLiveScore;
+const trackedToggles = new Map();
+const sampleCanvas = document.createElement('canvas');
+sampleCanvas.width = sampleCanvas.height = 9;
+const sampleContext = sampleCanvas.getContext('2d', {willReadFrequently: true});
+const trackingStatus = byId('toggleTrackingStatus');
+let pickToggleIndex;
+function stopToggleTracking() {
+  trackedToggles.clear();
+  pickToggleIndex = undefined;
+  liveTabVideo.classList.remove('pick-toggle');
+  trackingStatus.textContent = '';
+}
+byId('clearToggles').onclick = stopToggleTracking;
+byId('pickToggle').onclick = () => {
+  if (liveTabVideo.hidden || drawingLive || liveTabVideo.readyState < 2) {
+    trackingStatus.textContent = 'Return to the playing feed and exit Draw live to pick a Toggle.';
+    return;
+  }
+  pickToggleIndex = Number(byId('toggleTarget').value);
+  liveTabVideo.classList.add('pick-toggle');
+  trackingStatus.textContent = 'Click the center of the Toggle’s colored face in the feed.';
+};
+liveTabVideo.addEventListener('click', event => {
+  if (pickToggleIndex === undefined) return;
+  const bounds = liveTabVideo.getBoundingClientRect();
+  const scale = Math.min(bounds.width / liveTabVideo.videoWidth, bounds.height / liveTabVideo.videoHeight);
+  const width = liveTabVideo.videoWidth * scale, height = liveTabVideo.videoHeight * scale;
+  const x = (event.clientX - bounds.left - (bounds.width - width) / 2) / width;
+  const y = (event.clientY - bounds.top - (bounds.height - height) / 2) / height;
+  if (x < 0 || x > 1 || y < 0 || y > 1) return;
+  trackedToggles.set(pickToggleIndex, {x, y});
+  pickToggleIndex = undefined;
+  liveTabVideo.classList.remove('pick-toggle');
+  trackingStatus.textContent = trackedToggles.size + ' Toggle(s) tracked · Checks about every 7 seconds.';
+});
+function sampleToggleColor(x, y) {
+  const width = liveTabVideo.videoWidth, height = liveTabVideo.videoHeight;
+  const side = Math.min(9, width, height);
+  sampleContext.drawImage(liveTabVideo, Math.max(0, Math.min(width - side, x * width - side / 2)),
+    Math.max(0, Math.min(height - side, y * height - side / 2)), side, side, 0, 0, 9, 9);
+  const pixels = sampleContext.getImageData(0, 0, 9, 9).data;
+  const votes = {red: 0, blue: 0, neutral: 0};
+  for (let i = 0; i < pixels.length; i += 4) {
+    const [r, g, b] = [pixels[i], pixels[i + 1], pixels[i + 2]];
+    if (r > 90 && r > g * 1.35 && r > b * 1.35) votes.red++;
+    else if (b > 90 && b > r * 1.35 && b > g * 1.12) votes.blue++;
+    else if (r > 100 && g > 90 && Math.abs(r - g) < 65 && Math.min(r, g) > b * 1.4) votes.neutral++;
+  }
+  return Object.keys(votes).find(color => votes[color] >= 49);
+}
+setInterval(() => {
+  if (!trackedToggles.size || scorePanel.hidden || liveTabVideo.hidden || liveTabVideo.readyState < 2) return;
+  let uncertain = 0;
+  try {
+    for (const [index, point] of trackedToggles) {
+      const color = sampleToggleColor(point.x, point.y);
+      if (!color) { uncertain++; continue; }
+      scoreGoals.children[index].querySelector('select').value = color === 'neutral' ? '' : color;
+    }
+    refreshLiveScore();
+    trackingStatus.textContent = uncertain
+      ? uncertain + ' Toggle(s) unclear · Previous color kept. Correct it manually if needed.'
+      : trackedToggles.size + ' Toggle(s) checked · Next check in about 7 seconds.';
+  } catch {
+    trackingStatus.textContent = 'Could not read the shared video frame. You can still score manually.';
+  }
+}, 7000);
 const drawLiveTab = byId('drawLiveTab');
 reviewResize.observe(liveTabVideo);
 liveTabVideo.addEventListener('resize', layout);
@@ -1094,6 +1161,7 @@ function stopLiveTab(message = reviewHint) {
   freezeLiveTab.hidden = true;
   scoreButton.hidden = true;
   showLiveScore(false);
+  stopToggleTracking();
   liveSourceLink.hidden = true;
   liveRequest++;
   const stream = liveTabStream;
