@@ -26,8 +26,8 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 .tree-children{margin-left:17px;padding-left:0;border-color:#414145}.library .hint{margin:10px 14px;color:#999;font-size:11px}.review{grid-column:2;grid-row:2;padding:18px 22px}
 @media(max-width:680px){main{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto 1fr}header,.review,.library{grid-column:1}header{grid-row:1}.review{grid-row:2;padding:12px}.library{grid-row:3;border-top:1px solid #37373d}}
 .library input.tree-rename{display:block;width:calc(100% - 20px);height:23px;margin:0 10px;padding:0 5px}.folder-heading{display:flex;align-items:center}.folder-heading .tree-folder,.folder-heading .tree-rename{flex:1;min-width:0}.library .remove-folder{flex:none;padding:0 9px;border:0;background:transparent;color:#bbb;font-size:17px;line-height:23px}.library .remove-folder:hover{color:white;background:#733838}.folder-heading.drop-target{outline:1px solid #60aaff;outline-offset:-1px;background:#094771}.tree-video[draggable=true]{cursor:grab}.scout-form,.scout-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.scout-form{max-width:850px;margin:16px 0}.scout-fields,.scout-form .wide{grid-column:1/-1}.scout-form label{display:grid;gap:4px;font-size:13px}.scout-form input,.scout-form select,.scout-form textarea,.scout-actions select{width:100%;min-width:0;padding:7px;color:inherit;background:#252526;border:1px solid #56565e;border-radius:4px;font:inherit;margin:0}.scout-actions select{width:auto}.scout-results{overflow:auto}.scout-results table{border-collapse:collapse;width:100%;text-align:left}.scout-results th,.scout-results td{padding:9px;border-bottom:1px solid #46464b;vertical-align:top}.scout-results details{min-width:135px}.scout-results p{white-space:pre-wrap}.scout-results button{padding:4px 8px}.scout-actions{margin-top:24px}main.scouting-active .library{display:none}main.scouting-active{grid-template-columns:minmax(0,1fr)}main.scouting-active header,main.scouting-active #scouting{grid-column:1}
-.route-planner{border:1px solid #465363;border-radius:8px;padding:12px}.route-planner summary{cursor:pointer}.route-planner canvas{display:block;width:min(100%,480px);height:auto;touch-action:none;cursor:crosshair;margin:10px 0;border-radius:6px}.route-preview{display:block;width:min(100%,250px);height:auto;margin:8px 0}.route-planner iframe{display:block;width:100%;height:min(850px,85vh);min-height:440px;border:1px solid #465363;border-radius:6px}.route-planner a{color:#83b7e5}.scout-form{max-width:1150px}.scout-results .route-preview{position:static}.scout-workspace{display:grid;grid-template-columns:minmax(300px,2fr) minmax(0,3fr);gap:22px;align-items:start}.scout-workspace .scout-form{margin-top:0}#scouting>h1{margin-bottom:16px}.route-planner{min-width:0}.route-planner h2{font-size:15px;margin:0 0 12px}.route-fields{margin-top:12px}#routeFrames{margin-top:12px}.route-fields input,.route-fields select{background:#252526;border:1px solid #56565e;border-radius:4px;color:inherit;padding:6px;font:inherit}#routeTabs button{max-width:100%;overflow-wrap:anywhere}@media(max-width:900px){.scout-workspace{grid-template-columns:minmax(0,1fr)}}
-</style>
+.route-planner{border:1px solid #465363;border-radius:8px;padding:12px}.route-planner summary{cursor:pointer}.route-planner canvas{display:block;width:min(100%,480px);height:auto;touch-action:none;cursor:crosshair;margin:10px 0;border-radius:6px}.route-preview{display:block;width:min(100%,250px);height:auto;margin:8px 0}.route-planner iframe{display:block;width:100%;height:min(850px,85vh);min-height:440px;border:1px solid #465363;border-radius:6px}.route-planner a{color:#83b7e5}.scout-form{max-width:1150px}.scout-results canvas.route-preview{position:static}.scout-workspace{display:grid;grid-template-columns:minmax(300px,2fr) minmax(0,3fr);gap:22px;align-items:start}.scout-workspace .scout-form{margin-top:0}#scouting>h1{margin-bottom:16px}.route-planner{min-width:0}.route-planner h2{font-size:15px;margin:0 0 12px}.route-fields{margin-top:12px}#routeFrames{margin-top:12px}.route-fields input,.route-fields select{background:#252526;border:1px solid #56565e;border-radius:4px;color:inherit;padding:6px;font:inherit}#routeTabs button{max-width:100%;overflow-wrap:anywhere}@media(max-width:900px){.scout-workspace{grid-template-columns:minmax(0,1fr)}}
+.scout-field{position:relative;max-width:780px;margin:10px auto;background:#404850;aspect-ratio:1}.scout-field img,.scout-field canvas{position:absolute;inset:0;display:block;width:100%;height:100%}.scout-field canvas{margin:0;pointer-events:auto;touch-action:none;cursor:crosshair}</style>
 <main>
 <header><nav class="tools" aria-label="RoboCoach views"><button id="reviewView" aria-pressed="true">Video Review</button><button id="scoutView" aria-pressed="false">Scouting View</button></nav><label class="open" for="file">Open video</label><input id="file" type="file" accept="video/*" multiple hidden></header>
 <aside class="library" aria-label="Match library">
@@ -73,16 +73,19 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 
 <div class="tools wide"><button type="submit" id="saveScout">Save entry</button><button type="button" id="resetScout" hidden>Cancel edit</button></div>
 </form>
-<section class="route-planner" aria-label="LemLib path planner">
-<h2>LemLib path planner</h2>
+<section class="route-planner" aria-label="Field path planner">
+<h2>Field path planner</h2>
 <div class="tools" id="routeTabs" aria-label="Routes"></div>
 <div class="tools route-fields">
 <label>Route name <input id="routeName" maxlength="80" placeholder="split auto"></label>
 <label>Alliance color <select id="routeAlliance"><option value="">Choose color</option><option value="red">Red</option><option value="blue">Blue</option></select></label>
 </div>
-<p class="hint">Export from LemLib, then attach the export to save it with this scouting entry.</p>
-<div class="tools"><label class="open" for="attachRoute">Attach route export</label><input id="attachRoute" type="file" hidden><button id="downloadRoute" type="button" disabled>Download attached route</button><a href="https://yl-loaf.github.io/vex-path-planner/" target="_blank" rel="noopener">Open planner full screen</a></div>
-<div id="routeFrames"></div>
+<p class="hint">Tap to add waypoints or drag to draw. Save the scouting entry to keep all three routes.</p>
+<div class="scout-field">
+<img src="https://yl-loaf.github.io/vex-path-planner/field.jpg" alt="Overhead Override field">
+<canvas id="scoutField" width="800" height="800" aria-label="Draw the selected route"></canvas>
+</div>
+<div class="tools"><button type="button" id="undoScoutRoute">Undo</button><button type="button" id="clearScoutRoute">Clear route</button><button id="downloadRoute" type="button" hidden>Download attached route</button></div>
 </section></div>
 <div class="tools scout-actions">
 <label>Event <select id="scoutEvent"></select></label>
@@ -740,7 +743,7 @@ function renderScoutRows() {
         details.append(preview);
       }
       for (const savedRoute of entry.autonRoutes ?? []) {
-        if (!savedRoute.name && !savedRoute.color && !savedRoute.file) continue;
+        if (!savedRoute.name && !savedRoute.color && !savedRoute.file && !savedRoute.strokes?.length) continue;
         const item = document.createElement('p');
         item.textContent = routeTitle(savedRoute);
         if (savedRoute.file) {
@@ -750,6 +753,17 @@ function renderScoutRows() {
           item.append(' ', download);
         }
         details.append(item);
+        if (savedRoute.strokes?.length) {
+          const preview = document.createElement('div');
+          preview.className = 'scout-field route-preview';
+          const field = document.querySelector('.scout-field img').cloneNode();
+          const overlay = document.createElement('canvas');
+          overlay.width = overlay.height = 400;
+          overlay.style.pointerEvents = 'none';
+          preview.append(field, overlay);
+          drawField(overlay, savedRoute.strokes, true);
+          details.append(preview);
+        }
       }
       details.append(edit);
     }
@@ -834,7 +848,8 @@ byId('importScout').onchange = async event => {
 };
 let scoutRoutes = normalizeScoutRoutes();
 let selectedRoute = 0;
-const routeFrames = byId('routeFrames');
+const scoutField = byId('scoutField');
+let routeGesture;
 const routeName = byId('routeName');
 const routeAlliance = byId('routeAlliance');
 
@@ -846,6 +861,7 @@ function normalizeScoutRoutes(value) {
       number: index + 1,
       name: typeof item?.name === 'string' ? item.name.trim().slice(0, 80) : '',
       color: ['red', 'blue'].includes(item?.color) ? item.color : '',
+      strokes: validateRoute(item?.strokes),
       file: typeof file?.name === 'string' && typeof file?.data === 'string' &&
         file.data.length <= 3000000 && /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(file.data)
         ? {name: file.name, data: file.data} : null
@@ -873,22 +889,13 @@ function renderRouteTabs() {
   const item = scoutRoutes[selectedRoute];
   if (document.activeElement !== routeName) routeName.value = item.name;
   routeAlliance.value = item.color;
-  byId('downloadRoute').disabled = !item.file;
-  byId('downloadRoute').title = item.file?.name ?? '';
-  let frame = routeFrames.querySelector('[data-route="' + selectedRoute + '"]');
-  if (!frame) {
-    frame = document.createElement('iframe');
-    frame.dataset.route = selectedRoute;
-    frame.title = 'LemLib planner for Route ' + item.number;
-    frame.src = 'https://yl-loaf.github.io/vex-path-planner/';
-    routeFrames.append(frame);
-  }
-  for (const child of routeFrames.children) child.hidden = child !== frame;
+  byId('downloadRoute').hidden = !item.file;
+  paintScoutRoute();
 }
 function setScoutRoutes(value) {
   scoutRoutes = normalizeScoutRoutes(value);
   selectedRoute = 0;
-  routeFrames.replaceChildren();
+  routeGesture = undefined;
   renderRouteTabs();
 }
 routeName.oninput = () => {
@@ -899,24 +906,41 @@ routeAlliance.onchange = () => {
   scoutRoutes[selectedRoute].color = routeAlliance.value;
   renderRouteTabs();
 };
-byId('attachRoute').onchange = event => {
-  const input = event.target;
-  const file = input.files[0];
-  input.value = '';
-  if (!file) return;
-  if (file.size > 2000000) {
-    scoutStatus.textContent = 'Route exports must be under 2 MB.';
-    return;
-  }
-  const item = scoutRoutes[selectedRoute];
-  const reader = new FileReader();
-  reader.onload = () => {
-    item.file = {name: file.name, data: reader.result.split(',')[1] ?? ''};
-    renderRouteTabs();
-    scoutStatus.textContent = 'Attached ' + file.name + '. Save the scouting entry to keep it.';
-  };
-  reader.onerror = () => { scoutStatus.textContent = 'Could not read the route export.'; };
-  reader.readAsDataURL(file);
+function paintScoutRoute() {
+  const strokes = scoutRoutes[selectedRoute].strokes;
+  drawField(scoutField, strokes, true);
+  byId('undoScoutRoute').disabled = byId('clearScoutRoute').disabled = !strokes.length;
+}
+function scoutFieldPoint(event) {
+  const box = scoutField.getBoundingClientRect();
+  const normalize = value => Math.max(0, Math.min(1, (600 * value - 10) / 580));
+  return [normalize((event.clientX - box.left) / box.width), normalize((event.clientY - box.top) / box.height)];
+}
+scoutField.onpointerdown = event => {
+  const strokes = scoutRoutes[selectedRoute].strokes;
+  if (event.button !== 0 || routeGesture || strokes.length >= 200) return;
+  const stroke = [scoutFieldPoint(event)];
+  scoutField.setPointerCapture(event.pointerId);
+  routeGesture = {id: event.pointerId, stroke};
+  strokes.push(stroke);
+  paintScoutRoute();
+};
+scoutField.onpointermove = event => {
+  if (routeGesture?.id !== event.pointerId || routeGesture.stroke.length >= 1000) return;
+  const point = scoutFieldPoint(event);
+  const last = routeGesture.stroke.at(-1);
+  if (Math.hypot(point[0] - last[0], point[1] - last[1]) < .004) return;
+  routeGesture.stroke.push(point);
+  paintScoutRoute();
+};
+scoutField.onlostpointercapture = () => { routeGesture = undefined; };
+byId('undoScoutRoute').onclick = () => {
+  scoutRoutes[selectedRoute].strokes.pop();
+  paintScoutRoute();
+};
+byId('clearScoutRoute').onclick = () => {
+  scoutRoutes[selectedRoute].strokes = [];
+  paintScoutRoute();
 };
 function downloadRouteFile(file) {
   const bytes = Uint8Array.from(atob(file.data), character => character.charCodeAt(0));
@@ -937,12 +961,12 @@ function validateRoute(value) {
     stroke.every(point => Array.isArray(point) && point.length === 2 &&
       point.every(coordinate => Number.isFinite(coordinate) && coordinate >= 0 && coordinate <= 1)));
 }
-function drawField(canvas, strokes, cursor) {
+function drawField(canvas, strokes, overlay = false) {
   const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.save();
   ctx.scale(canvas.width / 600, canvas.height / 600);
-  ctx.fillStyle = '#707882';
-  ctx.fillRect(0, 0, 600, 600);
+
   function line(points, color, width) {
     ctx.beginPath();
     points.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
@@ -957,26 +981,30 @@ function drawField(canvas, strokes, cursor) {
     ctx.fillStyle = color;
     ctx.fill();
   }
-  for (let i = 100; i < 600; i += 100) {
-    line([[i, 0], [i, 600]], '#9299a0', 1);
-    line([[0, i], [600, i]], '#9299a0', 1);
-  }
-  line([[300, 200], [400, 300], [300, 400], [200, 300], [300, 200]], '#e9ebee', 3);
-  for (const [x, y, endX, endY] of [[45,45,250,250],[555,45,350,250],[45,555,250,350],[555,555,350,350]]) {
-    line([[x,y],[endX,endY]], '#e9ebee', 3);
-  }
-  for (const [x, y, color] of [[100,200,'#ffcb54'],[200,100,'#ffcb54'],[400,100,'#63b9ff'],[500,200,'#63b9ff'],[100,400,'#ff7272'],[200,500,'#ff7272'],[400,500,'#ffcb54'],[500,400,'#ffcb54'],[300,300,'#ffcb54']]) {
-    dot(x, y, 13, '#232a33');
-    dot(x, y, 8, color);
-  }
-  for (const [x, color] of [[8,'#b92e43'],[520,'#135b9c']]) {
-    for (const y of [22, 538]) {
-      ctx.fillStyle = color;
-      ctx.fillRect(x, y, 72, 40);
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 12px system-ui';
-      ctx.textAlign = 'center';
-      ctx.fillText('LOADER', x + 36, y + 24);
+  if (!overlay) {
+    ctx.fillStyle = '#707882';
+    ctx.fillRect(0, 0, 600, 600);
+    for (let i = 100; i < 600; i += 100) {
+      line([[i, 0], [i, 600]], '#9299a0', 1);
+      line([[0, i], [600, i]], '#9299a0', 1);
+    }
+    line([[300, 200], [400, 300], [300, 400], [200, 300], [300, 200]], '#e9ebee', 3);
+    for (const [x, y, endX, endY] of [[45,45,250,250],[555,45,350,250],[45,555,250,350],[555,555,350,350]]) {
+      line([[x,y],[endX,endY]], '#e9ebee', 3);
+    }
+    for (const [x, y, color] of [[100,200,'#ffcb54'],[200,100,'#ffcb54'],[400,100,'#63b9ff'],[500,200,'#63b9ff'],[100,400,'#ff7272'],[200,500,'#ff7272'],[400,500,'#ffcb54'],[500,400,'#ffcb54'],[300,300,'#ffcb54']]) {
+      dot(x, y, 13, '#232a33');
+      dot(x, y, 8, color);
+    }
+    for (const [x, color] of [[8,'#b92e43'],[520,'#135b9c']]) {
+      for (const y of [22, 538]) {
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y, 72, 40);
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 12px system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillText('LOADER', x + 36, y + 24);
+      }
     }
   }
   const points = strokes.flat().map(([x, y]) => [10 + x * 580, 10 + y * 580]);
@@ -990,14 +1018,11 @@ function drawField(canvas, strokes, cursor) {
     dot(...points.at(-1), 7, '#ffd36e');
     dot(...points[0], 8, '#40e398');
   }
-  if (cursor) {
-    const [x,y] = cursor;
-    dot(10 + x * 580, 10 + y * 580, 4, '#fff');
-  }
   ctx.restore();
 }
 </script>
 </html>
+
 
 
 
