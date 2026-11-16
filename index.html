@@ -37,7 +37,7 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 .review-expanded .review-divider{display:none}
 .review-expanded #status{grid-area:3/1/4/-1;margin:0}
 @media(max-width:540px){#videoReview.review-expanded{grid-template-columns:90px minmax(0,1fr);padding:6px;gap:6px}.review-expanded .annotation-tools{padding:5px}.review-expanded .annotation-tools button{padding:6px;font-size:13px}.review-expanded .playback-tools .track{min-width:65px}}
-.volume-control{display:flex;align-items:center;gap:6px;font-size:13px}.volume-control input{width:84px;accent-color:#b9f47e}main.scouting-active #profile{grid-column:1;grid-row:2}</style>
+.volume-control{display:flex;align-items:center;gap:6px;font-size:13px}.volume-control input{width:84px;accent-color:#b9f47e}main.scouting-active #profile{grid-column:1;grid-row:2}canvas.drawing.erasing{cursor:cell}</style>
 <main>
 <header><nav class="tools" aria-label="RoboCoach views"><button id="reviewView" aria-pressed="true">Video Review</button><button id="scoutView" aria-pressed="false">Scouting View</button><button id="profileView" aria-pressed="false">Profile</button></nav><label class="open" for="file">Open video</label><input id="file" type="file" accept="video/*" multiple hidden></header>
 <aside class="library" aria-label="Match library">
@@ -56,7 +56,7 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 </div>
 <hr class="review-divider" style="border:0;border-top:1px solid #35404d;margin:16px 0">
 <div class="tools annotation-tools" role="group" aria-label="Annotations">
-<button id="pen" aria-pressed="false" disabled>Pen</button><input id="color" type="color" aria-label="Pen color" value="#b9f47e"><button id="undo" disabled>Undo stroke</button><button id="clear" disabled>Clear frame</button><button id="note" disabled>Add note</button><select id="marks" aria-label="Jump to marked frame" disabled><option value="">Marked frames</option></select>
+<button id="pen" aria-pressed="false" disabled>Pen</button><button id="eraser" type="button" aria-pressed="false" disabled>Eraser</button><input id="color" type="color" aria-label="Pen color" value="#b9f47e"><button id="undo" disabled>Undo stroke</button><button id="clear" disabled>Clear frame</button><button id="note" disabled>Add note</button><select id="marks" aria-label="Jump to marked frame" disabled><option value="">Marked frames</option></select>
 </div>
 <p class="hint" id="status" role="status">Turn on the pen to pause and draw. Click a timeline dot to revisit a drawing or note. Drawings and notes save automatically to your match library.</p>
 <dialog id="noteDialog">
@@ -201,10 +201,15 @@ function updateMarks() {
   }
   marks.disabled = !timestamps().length;
 }
-function setPen(on) {
+const eraser = byId('eraser');
+let erasing = false;
+function setPen(on, erase = false) {
   drawing = on;
-  pen.setAttribute('aria-pressed', String(on));
+  erasing = erase;
+  pen.setAttribute('aria-pressed', String(on && !erase));
+  eraser.setAttribute('aria-pressed', String(erase));
   ink.classList.toggle('drawing', on);
+  ink.classList.toggle('erasing', erase);
   if (on) video.pause();
 }
 const matchDragType = 'application/x-robocoach-match';
@@ -469,7 +474,7 @@ function loadMatch(match, blob, review) {
   timeline.replaceChildren();
   marks.disabled = true;
   setPen(false);
-  byId('note').disabled = play.disabled = seek.disabled = pen.disabled = true;
+  byId('note').disabled = play.disabled = seek.disabled = pen.disabled = eraser.disabled = true;
   empty.hidden = false;
   empty.textContent = 'Loading video…';
   context.clearRect(0, 0, ink.width, ink.height);
@@ -530,7 +535,7 @@ function deleteVideo(match) {
         setPen(false);
         updateMarks();
         redraw();
-        byId('note').disabled = play.disabled = seek.disabled = pen.disabled = true;
+        byId('note').disabled = play.disabled = seek.disabled = pen.disabled = eraser.disabled = true;
         seek.value = 0;
         time.value = '0:00 / 0:00';
         empty.hidden = false;
@@ -606,7 +611,7 @@ function openSavedMatch(match) {
 }
 video.onloadedmetadata = () => {
   empty.hidden = true;
-  byId("note").disabled = play.disabled = seek.disabled = pen.disabled = false;
+  byId("note").disabled = play.disabled = seek.disabled = pen.disabled = eraser.disabled = false;
   seek.max = video.duration;
   updateMarks();
   layout();
@@ -660,7 +665,8 @@ play.onclick = async () => {
   } else video.pause();
 };
 seek.oninput = () => { video.currentTime = Number(seek.value); };
-pen.onclick = () => setPen(!drawing);
+pen.onclick = () => setPen(!drawing || erasing);
+eraser.onclick = () => setPen(!erasing, !erasing);
 marks.onchange = () => {
   if (marks.value === '') return;
   video.pause();
@@ -685,9 +691,40 @@ function point(event) {
     y: Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height))
   };
 }
+function eraseAt(event, timestamp) {
+  const bounds = ink.getBoundingClientRect();
+  const x = event.clientX - bounds.left;
+  const y = event.clientY - bounds.top;
+  const strokes = drawings.get(timestamp);
+  if (!strokes) return false;
+  const remaining = strokes.filter(({points}) => !points.some((end, index) => {
+    const start = points[Math.max(0, index - 1)];
+    const ax = start.x * bounds.width;
+    const ay = start.y * bounds.height;
+    const dx = (end.x - start.x) * bounds.width;
+    const dy = (end.y - start.y) * bounds.height;
+    const length = dx * dx + dy * dy;
+    const t = length ? Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / length)) : 0;
+    return Math.hypot(x - ax - t * dx, y - ay - t * dy) <= 12;
+  }));
+  if (remaining.length === strokes.length) return false;
+  if (remaining.length) drawings.set(timestamp, remaining);
+  else drawings.delete(timestamp);
+  redraw();
+  return true;
+}
 ink.onpointerdown = event => {
   if (!drawing || active || event.button !== 0) return;
   const timestamp = frame();
+  if (erasing) {
+    active = {id: event.pointerId, timestamp};
+    ink.setPointerCapture(event.pointerId);
+    if (eraseAt(event, timestamp)) {
+      updateMarks();
+      saveAnnotations();
+    }
+    return;
+  }
   const strokes = drawings.get(timestamp) ?? [];
   const stroke = {color: color.value, points: [point(event)]};
   strokes.push(stroke);
@@ -698,14 +735,24 @@ ink.onpointerdown = event => {
 };
 ink.onpointermove = event => {
   if (active?.id !== event.pointerId) return;
+  if (!active.stroke) {
+    if (eraseAt(event, active.timestamp)) {
+      updateMarks();
+      saveAnnotations();
+    }
+    return;
+  }
   active.stroke.points.push(point(event));
   redraw();
 };
 ink.onlostpointercapture = event => {
   if (active?.id !== event.pointerId) return;
+  const drew = Boolean(active.stroke);
   active = undefined;
-  updateMarks();
-  saveAnnotations();
+  if (drew) {
+    updateMarks();
+    saveAnnotations();
+  }
 };
 undo.onclick = () => {
   const timestamp = frame();
@@ -1260,6 +1307,7 @@ function drawField(canvas, strokes, overlay = false) {
 }
 </script>
 </html>
+
 
 
 
