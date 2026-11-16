@@ -48,7 +48,7 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
   #scoreGoals{grid-template-columns:repeat(2,minmax(0,1fr))}
   #scoreGoals fieldset:last-child{grid-column:1/-1}
 }
-#liveTabVideo.pick-toggle{cursor:crosshair}#toggleTrackingStatus:empty{display:none}</style>
+#liveTabVideo.pick-toggle{cursor:crosshair}#toggleTrackingStatus:empty{display:none}#liveAnnotationName{display:block;width:100%;margin:8px 0;padding:8px;color:inherit;background:#303136;border:1px solid #56565e;border-radius:4px}</style>
 <main>
 <header><nav class="tools" aria-label="RoboCoach views"><button id="reviewView" aria-pressed="true">Video Review</button><button id="scoutView" aria-pressed="false">Scouting View</button><button id="profileView" aria-pressed="false">Profile</button></nav><label class="open" for="file">Open video</label><input id="file" type="file" accept="video/*" multiple hidden></header>
 <aside class="library" aria-label="Match library">
@@ -63,7 +63,7 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 <section class="review" id="videoReview" aria-label="Video review">
 <div class="stage"><video id="video" playsinline preload="metadata"></video><video id="liveTabVideo" playsinline autoplay hidden aria-label="Live tab feed"></video><canvas id="frozenLiveFrame" aria-label="Frozen live frame" hidden></canvas><iframe id="youtubeVideo" title="YouTube match player" referrerpolicy="strict-origin-when-cross-origin" allow="encrypted-media; picture-in-picture; fullscreen" allowfullscreen hidden></iframe><canvas id="ink" aria-label="Freehand drawing overlay"></canvas><div id="empty" class="empty">Open a match video to start.</div></div>
 <div class="tools playback-tools">
-<button id="play" disabled>Play</button><div class="track"><input class="seek" id="seek" aria-label="Video position" type="range" min="0" max="0" step="any" value="0" disabled><div id="timeline" class="timeline" aria-label="Annotation markers"></div></div><output id="time">0:00 / 0:00</output><label class="volume-control">Volume <input id="reviewVolume" type="range" min="0" max="100" value="100"></label><button id="openYouTube" type="button">Open YouTube</button><button id="pauseYouTube" type="button" hidden disabled>Pause YouTube</button><button id="closeYouTube" type="button" hidden>Close YouTube</button><input id="liveSourceLink" type="url" aria-label="Source video link" placeholder="Source video link (optional)" hidden><button id="liveScoreButton" type="button" hidden aria-expanded="false">Live score</button><button id="drawLiveTab" type="button" hidden aria-pressed="false">Draw live</button><button id="freezeLiveTab" type="button" hidden>Freeze &amp; Annotate</button><button id="shareLiveTab" type="button">Share live tab</button><button id="fullscreenReview" type="button" aria-pressed="false">Fullscreen</button>
+<button id="play" disabled>Play</button><div class="track"><input class="seek" id="seek" aria-label="Video position" type="range" min="0" max="0" step="any" value="0" disabled><div id="timeline" class="timeline" aria-label="Annotation markers"></div></div><output id="time">0:00 / 0:00</output><label class="volume-control">Volume <input id="reviewVolume" type="range" min="0" max="100" value="100"></label><button id="openYouTube" type="button">Open YouTube</button><button id="pauseYouTube" type="button" hidden disabled>Pause YouTube</button><button id="closeYouTube" type="button" hidden>Close YouTube</button><input id="liveSourceLink" type="url" aria-label="Source video link" placeholder="Source video link (optional)" hidden><button id="liveScoreButton" type="button" hidden aria-expanded="false">Live score</button><button id="drawLiveTab" type="button" hidden aria-pressed="false">Draw live</button><button id="saveLiveAnnotation" type="button" hidden>Save annotation</button><button id="freezeLiveTab" type="button" hidden>Freeze &amp; Annotate</button><button id="shareLiveTab" type="button">Share live tab</button><button id="fullscreenReview" type="button" aria-pressed="false">Fullscreen</button>
 </div>
 <hr class="review-divider" style="border:0;border-top:1px solid #35404d;margin:16px 0">
 <div class="tools annotation-tools" role="group" aria-label="Annotations">
@@ -76,6 +76,14 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 <div id="scoreGoals"></div><div class="tools"><label>Track Toggle <select id="toggleTarget"><option value="0">Top left</option><option value="1">Top right</option><option value="2">Bottom left</option><option value="3">Bottom right</option></select></label><button type="button" id="pickToggle">Pick on video</button><button type="button" id="clearToggles">Stop auto tracking</button></div><p class="hint" id="toggleTrackingStatus" role="status"></p>
 <label>Autonomous bonus <select id="scoreAuton"><option value="">None / pending</option><option value="red">Red +12</option><option value="blue">Blue +12</option><option value="tie">Tie +6 each</option></select></label>
 <p class="hint" id="scoreChange"></p></section>
+<dialog id="nameLiveAnnotation">
+<form id="saveLiveForm">
+<label for="liveAnnotationName">Annotation name</label>
+<input id="liveAnnotationName" maxlength="120" required autofocus>
+<p class="hint" id="liveAnnotationFolder"></p>
+<p class="hint" id="liveAnnotationError" role="status"></p>
+<div class="tools"><button id="confirmLiveAnnotation" type="submit">Save annotation</button><button id="cancelLiveAnnotation" type="button">Cancel</button></div>
+</form></dialog>
 <dialog id="savedLiveDialog" aria-label="Saved live annotation">
 <p id="savedLiveTitle"></p><img id="savedLiveImage" alt="Annotated frame from a shared tab">
 <div class="tools"><a id="savedLiveSource" target="_blank" rel="noopener noreferrer" hidden>Open source video</a><form method="dialog"><button>Close</button></form></div>
@@ -320,10 +328,7 @@ let pendingSave = Promise.resolve();
 let deletingVideo;
 function saveAnnotations() {
   if (drawingLive) return;
-  if (!frozenLiveFrame.hidden) {
-    saveLiveFrame();
-    return;
-  }
+  if (!frozenLiveFrame.hidden) return;
   if (!currentMatch || currentMatch.id === deletingVideo) return;
   const id = currentMatch.id;
   const review = structuredClone({drawings: [...drawings], notes: [...notes]});
@@ -568,7 +573,7 @@ file.onchange = () => {
   if (blobs.length) importVideos(blobs, selectedFolder);
 };
 function deleteVideo(match) {
-  if (switching || (match.kind === 'live-frame' && match.id === liveFrameId && !frozenLiveFrame.hidden) || !confirm('Delete ' + match.name + ' and its saved drawings and notes?')) return;
+  if (switching || !confirm('Delete ' + match.name + ' and its saved drawings and notes?')) return;
   return changeMatch(async () => {
     deletingVideo = match.id;
     try {
@@ -1056,8 +1061,40 @@ drawLiveTab.onclick = () => {
 const liveSourceLink = byId('liveSourceLink');
 const savedLiveDialog = byId('savedLiveDialog');
 const savedLiveImage = byId('savedLiveImage');
-let liveFrameId;
-let liveFrameFolder;
+const saveLiveAnnotation = byId('saveLiveAnnotation');
+const nameLiveAnnotation = byId('nameLiveAnnotation');
+const liveAnnotationName = byId('liveAnnotationName');
+const confirmLiveAnnotation = byId('confirmLiveAnnotation');
+const liveAnnotationError = byId('liveAnnotationError');
+saveLiveAnnotation.onclick = () => {
+  liveAnnotationName.value = '';
+  liveAnnotationError.textContent = '';
+  byId('liveAnnotationFolder').textContent = 'Save to ' + folderLabel(selectedFolder);
+  nameLiveAnnotation.showModal();
+};
+byId('cancelLiveAnnotation').onclick = () => nameLiveAnnotation.close();
+nameLiveAnnotation.addEventListener('cancel', event => {
+  if (confirmLiveAnnotation.disabled) event.preventDefault();
+});
+byId('saveLiveForm').onsubmit = async event => {
+  event.preventDefault();
+  const name = liveAnnotationName.value.trim();
+  if (!name) {
+    liveAnnotationError.textContent = 'Enter a name for this annotation.';
+    return;
+  }
+  if (frozenLiveFrame.hidden) return;
+  confirmLiveAnnotation.disabled = byId('cancelLiveAnnotation').disabled = true;
+  liveAnnotationError.textContent = '';
+  try {
+    await saveLiveFrame(name, selectedFolder);
+    nameLiveAnnotation.close();
+  } catch {
+    liveAnnotationError.textContent = 'Could not save the annotation. Try again.';
+  } finally {
+    confirmLiveAnnotation.disabled = byId('cancelLiveAnnotation').disabled = false;
+  }
+};
 let savedLiveImageUrl;
 function sourceVideoUrl(value) {
   try {
@@ -1065,16 +1102,9 @@ function sourceVideoUrl(value) {
     return ['http:', 'https:'].includes(url.protocol) ? url.href : '';
   } catch { return ''; }
 }
-function saveLiveFrame() {
-  const id = liveFrameId;
-  if (!id) return;
-  const existing = savedMatches.find(match => match.id === id);
-  const source = sourceVideoUrl(liveSourceLink.value);
-  const match = {
-    id, kind: 'live-frame', source,
-    folder: existing?.folder ?? liveFrameFolder,
-    name: existing?.name ?? 'Live annotation · ' + new Date().toLocaleTimeString()
-  };
+async function saveLiveFrame(name, folder) {
+  const id = crypto.randomUUID();
+  const match = {id, kind: 'live-frame', source: sourceVideoUrl(liveSourceLink.value), folder, name};
   const width = frozenLiveFrame.width, height = frozenLiveFrame.height;
   const snapshot = document.createElement('canvas');
   snapshot.width = width;
@@ -1082,19 +1112,17 @@ function saveLiveFrame() {
   const surface = snapshot.getContext('2d');
   surface.drawImage(frozenLiveFrame, 0, 0);
   if (ink.width && ink.height) surface.drawImage(ink, 0, 0, width, height);
-  const encoded = new Promise(resolve => snapshot.toBlob(resolve, 'image/png'));
-  pendingSave = pendingSave.then(async () => {
-    const blob = await encoded;
-    if (!blob) throw new Error('Could not save the annotated frame.');
-    await write([['matches', match], ['videos', blob, id]]);
-    expanded.add(match.folder);
+  const blob = await new Promise(resolve => snapshot.toBlob(resolve, 'image/png'));
+  if (!blob) throw new Error('Could not save the annotated frame.');
+  await write([['matches', match], ['videos', blob, id]]);
+  expanded.add(folder);
+  try {
     await refreshLibrary();
-    libraryStatus.textContent = 'Live annotation saved in ' + folderLabel(match.folder) + '.';
-  }).catch(storageError);
+    libraryStatus.textContent = 'Saved ' + name + ' in ' + folderLabel(folder) + '.';
+  } catch (error) {
+    storageError(error);
+  }
 }
-liveSourceLink.onchange = () => {
-  if (!frozenLiveFrame.hidden && frozenDrawings.has(0)) saveLiveFrame();
-};
 function openLiveFrame(match, blob) {
   if (!blob) throw new Error('Saved frame is unavailable.');
   if (savedLiveImageUrl) URL.revokeObjectURL(savedLiveImageUrl);
@@ -1117,6 +1145,8 @@ savedLiveDialog.onclose = () => {
 function returnToLive() {
   if (frozenLiveFrame.hidden) return;
   frozenLiveFrame.hidden = true;
+  saveLiveAnnotation.hidden = true;
+  if (nameLiveAnnotation.open) nameLiveAnnotation.close();
   liveTabVideo.hidden = false;
   frozenDrawings.clear();
   active = undefined;
@@ -1139,14 +1169,13 @@ freezeLiveTab.onclick = () => {
   }
   if (drawingLive) setLiveDrawing(false);
   drawLiveTab.hidden = true;
-  liveFrameId = crypto.randomUUID();
-  liveFrameFolder = selectedFolder;
   frozenLiveFrame.width = liveTabVideo.videoWidth;
   frozenLiveFrame.height = liveTabVideo.videoHeight;
   frozenLiveFrame.getContext('2d').drawImage(liveTabVideo, 0, 0);
   active = undefined;
   liveTabVideo.hidden = true;
   frozenLiveFrame.hidden = false;
+  saveLiveAnnotation.hidden = false;
   byId('videoReview').classList.add('live-frozen');
   pen.disabled = eraser.disabled = false;
   setPen(true);
