@@ -69,7 +69,7 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 </section>
 <section id="scouting" class="review" hidden aria-label="Scouting View">
 <h1>Scouting View</h1>
-<div class="scout-workspace"><form id="scoutForm" class="scout-form">
+<div class="scout-workspace" id="scoutWorkspace"><form id="scoutForm" class="scout-form">
 <label>Entry type<select name="kind"><option>Match observation</option><option>Pit interview</option></select></label>
 <label>Team number<input name="team" required maxlength="30"></label>
 <label>Event<select name="event"><option value="">No event</option></select><input id="newScoutEvent" aria-label="New event name" placeholder="New event name" maxlength="100" hidden></label>
@@ -90,7 +90,7 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 <label>Route name <input id="routeName" maxlength="80" placeholder="split auto"></label>
 <label>Alliance color <select id="routeAlliance"><option value="">Choose color</option><option value="red">Red</option><option value="blue">Blue</option></select></label>
 </div>
-<p class="hint">Use Draw to add waypoints or sketch. Switch to Move to drag existing nodes. Ctrl+Z undoes your last change. Save the scouting entry to keep your routes.</p>
+<p class="hint">Use Draw to add waypoints or sketch. Switch to Move to drag existing nodes. Ctrl+Z undoes your last change. <span id="plannerSaveHint">Save the scouting entry to keep your routes.</span></p>
 <div class="field-editor"><div class="field-tools" role="group" aria-label="Path editor tools"><button type="button" id="routeDraw" aria-pressed="true" title="Draw waypoints or strokes"><span aria-hidden="true">✎</span>Draw</button><button type="button" id="routeMove" aria-pressed="false" title="Move existing waypoints"><span aria-hidden="true">✥</span>Move</button></div><div class="scout-field">
 <img src="https://yl-loaf.github.io/vex-path-planner/field.jpg" alt="Overhead Override field">
 <canvas id="scoutField" tabindex="0" width="800" height="800" aria-label="Draw the selected route"></canvas>
@@ -108,7 +108,7 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 </section>
 <section class="review" id="profile" hidden aria-labelledby="profileTitle">
 <h1 id="profileTitle">Robot Profile</h1>
-<form class="scout-form" id="profileForm">
+<div class="scout-workspace" id="profileWorkspace"><form class="scout-form" id="profileForm">
 <label>Team number<input name="team" maxlength="30"></label>
 <label>Team name<input name="teamName" maxlength="100"></label>
 <label>Robot name<input name="robot" maxlength="100"></label>
@@ -117,7 +117,7 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 <label class="wide">Scoring strengths and preferred alliance role<textarea name="strengths" rows="3"></textarea></label>
 <label class="wide">Notes<textarea name="notes" rows="3"></textarea></label>
 <div class="tools wide"><button type="submit">Save profile</button><span class="hint" id="profileStatus" role="status">Saved in this browser.</span></div>
-</form>
+</form></div>
 </section></main>
 <script>
 const byId = id => document.getElementById(id);
@@ -792,6 +792,7 @@ let scoutBusy = false;
 const scoutControls = [...scoutForm.querySelectorAll('[name]')];
 
 function showView(view) {
+  if (view !== 'review') mountRoutePlanner(view);
   byId('videoReview').hidden = view !== 'review';
   byId('scouting').hidden = view !== 'scout';
   byId('profile').hidden = view !== 'profile';
@@ -825,8 +826,10 @@ video.addEventListener('volumechange', () => { volume.value = Math.round(video.v
 
 const profileForm = byId('profileForm');
 const profileStatus = byId('profileStatus');
+let savedProfileRoutes;
 try {
   const savedProfile = JSON.parse(localStorage.getItem('robocoach.profile') ?? '{}');
+  savedProfileRoutes = savedProfile?.autonRoutes;
   for (const field of profileForm.querySelectorAll('[name]')) {
     if (typeof savedProfile?.[field.name] === 'string') field.value = savedProfile[field.name];
   }
@@ -837,7 +840,9 @@ profileForm.oninput = () => { profileStatus.textContent = 'Unsaved changes'; };
 profileForm.onsubmit = event => {
   event.preventDefault();
   try {
-    localStorage.setItem('robocoach.profile', JSON.stringify(Object.fromEntries(new FormData(profileForm))));
+    const profile = Object.fromEntries(new FormData(profileForm));
+    profile.autonRoutes = plannerView === 'profile' ? scoutRoutes : plannerDrafts.profile.routes;
+    localStorage.setItem('robocoach.profile', JSON.stringify(profile));
     profileStatus.textContent = 'Profile saved in this browser.';
   } catch {
     profileStatus.textContent = 'Could not save the profile. Check browser storage.';
@@ -1083,6 +1088,27 @@ byId('importScout').onchange = async event => {
 let scoutRoutes = normalizeScoutRoutes();
 let selectedRoute = 0;
 let routeHistory = scoutRoutes.map(() => []);
+let plannerView = 'scout';
+const profileRoutes = normalizeScoutRoutes(savedProfileRoutes);
+const plannerDrafts = {
+  profile: {routes: profileRoutes, selected: 0, history: profileRoutes.map(() => [])}
+};
+function mountRoutePlanner(view) {
+  if (view === plannerView) return;
+  plannerDrafts[plannerView] = {routes: scoutRoutes, selected: selectedRoute, history: routeHistory};
+  const draft = plannerDrafts[view];
+  scoutRoutes = draft.routes;
+  selectedRoute = draft.selected;
+  routeHistory = draft.history;
+  plannerView = view;
+  routeGesture = undefined;
+  byId(view === 'profile' ? 'profileWorkspace' : 'scoutWorkspace').append(byId('scoutPlanner'));
+  byId('plannerSaveHint').textContent = view === 'profile' ? 'Save your profile to keep your routes.' : 'Save the scouting entry to keep your routes.';
+  renderRouteTabs();
+}
+function markRouteChanged() {
+  if (plannerView === 'profile') profileStatus.textContent = 'Unsaved changes';
+}
 const scoutField = byId('scoutField');
 let routeGesture;
 let routeTool = 'draw';
@@ -1140,22 +1166,31 @@ byId('addScoutRoute').onclick = () => {
   selectedRoute = scoutRoutes.length;
   scoutRoutes.push({number: selectedRoute + 1, name: '', color: '', strokes: [], file: null});
   routeHistory.push([]);
+  markRouteChanged();
   renderRouteTabs();
   routeName.focus();
 };
 function setScoutRoutes(value) {
-  scoutRoutes = normalizeScoutRoutes(value);
-  routeHistory = scoutRoutes.map(() => []);
+  const routes = normalizeScoutRoutes(value);
+  const history = routes.map(() => []);
+  if (plannerView !== 'scout') {
+    plannerDrafts.scout = {routes, selected: 0, history};
+    return;
+  }
+  scoutRoutes = routes;
+  routeHistory = history;
   selectedRoute = 0;
   routeGesture = undefined;
   renderRouteTabs();
 }
 routeName.oninput = () => {
   scoutRoutes[selectedRoute].name = routeName.value.trim();
+  markRouteChanged();
   renderRouteTabs();
 };
 routeAlliance.onchange = () => {
   scoutRoutes[selectedRoute].color = routeAlliance.value;
+  markRouteChanged();
   renderRouteTabs();
 };
 function paintScoutRoute() {
@@ -1170,6 +1205,7 @@ function scoutFieldPoint(event) {
   return [normalize((event.clientX - box.left) / box.width), normalize((event.clientY - box.top) / box.height)];
 }
 function rememberRoute() {
+  markRouteChanged();
   const history = routeHistory[selectedRoute];
   history.push(structuredClone(scoutRoutes[selectedRoute].strokes));
   if (history.length > 50) history.shift();
@@ -1211,11 +1247,15 @@ scoutField.onlostpointercapture = () => { routeGesture = undefined; };
 function undoScoutRoute() {
   if (routeGesture) return;
   const previous = routeHistory[selectedRoute].pop();
-  if (previous) scoutRoutes[selectedRoute].strokes = previous;
+  if (previous) {
+    scoutRoutes[selectedRoute].strokes = previous;
+    markRouteChanged();
+  }
   paintScoutRoute();
 }
 byId('undoScoutRoute').onclick = undoScoutRoute;
-byId('scouting').addEventListener('keydown', event => {
+document.addEventListener('keydown', event => {
+  if (byId('scouting').hidden && byId('profile').hidden) return;
   if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.key.toLowerCase() !== 'z' ||
       event.target.closest('input, textarea, select, [contenteditable]')) return;
   if (!routeHistory[selectedRoute].length) return;
@@ -1307,6 +1347,7 @@ function drawField(canvas, strokes, overlay = false) {
 }
 </script>
 </html>
+
 
 
 
