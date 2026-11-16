@@ -26,7 +26,7 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 .tree-children{margin-left:17px;padding-left:0;border-color:#414145}.library .hint{margin:10px 14px;color:#999;font-size:11px}.review{grid-column:2;grid-row:2;padding:18px 22px}
 @media(max-width:680px){main{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto 1fr}header,.review,.library{grid-column:1}header{grid-row:1}.review{grid-row:2;padding:12px}.library{grid-row:3;border-top:1px solid #37373d}}
 .library input.tree-rename{display:block;width:calc(100% - 20px);height:23px;margin:0 10px;padding:0 5px}.folder-heading{display:flex;align-items:center}.folder-heading .tree-folder,.folder-heading .tree-rename{flex:1;min-width:0}.library .remove-folder{flex:none;padding:0 9px;border:0;background:transparent;color:#bbb;font-size:17px;line-height:23px}.library .remove-folder:hover{color:white;background:#733838}.folder-heading.drop-target{outline:1px solid #60aaff;outline-offset:-1px;background:#094771}.tree-video[draggable=true]{cursor:grab}.scout-form,.scout-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.scout-form{max-width:850px;margin:16px 0}.scout-fields,.scout-form .wide{grid-column:1/-1}.scout-form label{display:grid;gap:4px;font-size:13px}.scout-form input,.scout-form select,.scout-form textarea,.scout-actions select{width:100%;min-width:0;padding:7px;color:inherit;background:#252526;border:1px solid #56565e;border-radius:4px;font:inherit;margin:0}.scout-actions select{width:auto}.scout-results{overflow:auto}.scout-results table{border-collapse:collapse;width:100%;text-align:left}.scout-results th,.scout-results td{padding:9px;border-bottom:1px solid #46464b;vertical-align:top}.scout-results details{min-width:135px}.scout-results p{white-space:pre-wrap}.scout-results button{padding:4px 8px}.scout-actions{margin-top:24px}main.scouting-active .library{display:none}main.scouting-active{grid-template-columns:minmax(0,1fr)}main.scouting-active header,main.scouting-active #scouting{grid-column:1}
-.route-planner{border:1px solid #465363;border-radius:8px;padding:12px}.route-planner summary{cursor:pointer}.route-planner canvas{display:block;width:min(100%,480px);height:auto;touch-action:none;cursor:crosshair;margin:10px 0;border-radius:6px}.route-preview{display:block;width:min(100%,250px);height:auto;margin:8px 0}</style>
+.route-planner{border:1px solid #465363;border-radius:8px;padding:12px}.route-planner summary{cursor:pointer}.route-planner canvas{display:block;width:min(100%,480px);height:auto;touch-action:none;cursor:crosshair;margin:10px 0;border-radius:6px}.route-preview{display:block;width:min(100%,250px);height:auto;margin:8px 0}.route-planner iframe{display:block;width:100%;height:min(850px,85vh);min-height:440px;border:1px solid #465363;border-radius:6px}.route-planner a{color:#83b7e5}.scout-form{max-width:1150px}.scout-results .route-preview{position:static}</style>
 <main>
 <header><nav class="tools" aria-label="RoboCoach views"><button id="reviewView" aria-pressed="true">Video Review</button><button id="scoutView" aria-pressed="false">Scouting View</button></nav><label class="open" for="file">Open video</label><input id="file" type="file" accept="video/*" multiple hidden></header>
 <aside class="library" aria-label="Match library">
@@ -63,45 +63,27 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 <label>Team number<input name="team" required maxlength="30"></label>
 <label>Event<input name="event" maxlength="100"></label>
 <label>Scout<input name="scout" maxlength="80"></label>
-<div id="matchFields" class="scout-fields">
-<label>Match # / alliance color<input name="match"></label>
-<label>Partner team<input name="partner"></label>
-<label>Auton points observed<input name="points" type="number" min="0" step="1"></label>
-<label>Auton result<select name="result"><option value="">Unclear</option><option>Full</option><option>Partial</option><option>Failed</option></select></label>
-<label>Alliance goal placements<input name="alliance" type="number" min="0"></label>
-<label>Neutral short placements<input name="short" type="number" min="0"></label>
-<label>Neutral tall placements<input name="tall" type="number" min="0"></label>
-<label>Yellow placements (subset)<input name="yellow" type="number" min="0"></label>
-<label>Toggle changes to own color<input name="toggles" type="number" min="0"></label>
-<label>Match loads collected<input name="loads" type="number" min="0"></label>
-<label>Midfield finish<select name="midfield"><option>Unclear</option><option>Yes</option><option>No</option></select></label>
-</div>
-<div id="pitFields" class="scout-fields" hidden>
-<label>Backup routine / start<input name="backup"></label>
-<label>Auton successes / attempts<input name="attempts"></label>
-<label>Claim to verify<input name="claim"></label>
-</div>
-<label>Auton route, starting side and AWP contribution<textarea name="auton" rows="2"></textarea></label>
-<label>Driver strengths, goal preference, cycle time and issues<textarea name="driver" rows="2"></textarea></label>
-<label>Best alliance role<input name="role"></label>
-<label>Compatibility with our team<select name="fit"><option value="">Unrated</option><option value="5">5 — Excellent</option><option value="4">4 — Good</option><option value="3">3 — Mixed</option><option value="2">2 — Limited</option><option value="1">1 — Poor</option></select></label>
-<label class="wide">Partner needs, endgame plan, concerns or availability<textarea name="notes" rows="2"></textarea></label>
+<label id="matchFields">Match # / alliance color<input name="match"></label>
+<label>Scoring / 10<input name="scoring" type="number" min="1" max="10" step="1"></label>
+<label>Game sense / driving / 10<input name="driving" type="number" min="1" max="10" step="1"></label>
+<label>Autonomous / 10<input name="autonomous" type="number" min="1" max="10" step="1"></label>
+<label>Compatibility / 10<input name="compatibility" type="number" min="1" max="10" step="1"></label>
+<label class="wide">Notes<textarea name="notes" rows="3"></textarea></label>
 <details class="wide route-planner" id="routePlanner">
-<summary>Field path planner</summary>
-<p class="hint">Tap to add a waypoint or drag to sketch a route. The first dot is the start.</p>
-<canvas id="routeField" width="720" height="720" tabindex="0" aria-label="Override practice field. Tap or drag to draw. Use arrow keys to move the cursor and Enter to add a waypoint."></canvas>
-<div class="tools"><button type="button" id="routeUndo" disabled>Undo</button><button type="button" id="routeClear" disabled>Clear route</button></div>
+<summary>LemLib path planner</summary>
+<p class="hint">Use the planner’s own save and export controls. <a href="https://yl-loaf.github.io/vex-path-planner/" target="_blank" rel="noopener">Open full screen</a></p>
+<iframe id="lemLibPlanner" title="VEX V5 LemLib Path Planner" data-src="https://yl-loaf.github.io/vex-path-planner/" referrerpolicy="no-referrer"></iframe>
 </details>
 <div class="tools wide"><button type="submit" id="saveScout">Save entry</button><button type="button" id="resetScout" hidden>Cancel edit</button></div>
 </form>
 <div class="tools scout-actions">
 <label>Event <select id="scoutEvent"></select></label>
-<label>Sort teams by <select id="scoutSort"><option value="points">Average auton points</option><option value="fit">Average compatibility</option><option value="team">Team number</option></select></label>
+<label>Sort teams by <select id="scoutSort"><option value="autonomous">Average autonomous</option><option value="scoring">Average scoring</option><option value="driving">Average game sense / driving</option><option value="compatibility">Average compatibility</option><option value="team">Team number</option></select></label>
 <button id="exportScout">Export entries</button>
 <label class="open" for="importScout">Import entries</label><input id="importScout" type="file" accept=".json,application/json" hidden>
 </div>
 <p id="scoutStatus" class="hint" role="status">Entries are saved in this browser. Use export and import to combine scouts’ entries across devices.</p>
-<div class="scout-results"><table><thead><tr><th>Team</th><th>Avg. auton</th><th>Avg. fit / 5</th><th>Entries</th></tr></thead><tbody id="scoutRows"></tbody></table></div>
+<div class="scout-results"><table><thead><tr><th>Team</th><th>Scoring / 10</th><th>Driving / 10</th><th>Autonomous / 10</th><th>Compatibility / 10</th><th>Entries</th></tr></thead><tbody id="scoutRows"></tbody></table></div>
 </section></main>
 <script>
 const byId = id => document.getElementById(id);
@@ -655,11 +637,8 @@ byId('reviewView').onclick = () => showScoutView(false);
 byId('scoutView').onclick = () => showScoutView(true);
 function updateScoutFields() {
   const pit = scoutForm.elements.kind.value === 'Pit interview';
-  for (const [id, hidden] of [['matchFields', pit], ['pitFields', !pit]]) {
-    const section = byId(id);
-    section.hidden = hidden;
-    for (const control of section.querySelectorAll('[name]')) control.disabled = hidden;
-  }
+  byId('matchFields').hidden = pit;
+  scoutForm.elements.match.disabled = pit;
 }
 scoutForm.elements.kind.onchange = updateScoutFields;
 updateScoutFields();
@@ -668,8 +647,7 @@ function resetScoutForm() {
   const {event, scout} = scoutForm.elements;
   const context = [event.value, scout.value];
   scoutForm.reset();
-  route = [];
-  paintRoute();
+
   [event.value, scout.value] = context;
   updateScoutFields();
   byId('saveScout').textContent = 'Save entry';
@@ -687,8 +665,12 @@ async function refreshScouting() {
   scoutEvent.value = events.includes(event) ? event : '';
   renderScoutRows();
 }
+const ratingKeys = ['scoring', 'driving', 'autonomous', 'compatibility'];
+function scoutRating(entry, key) {
+  return entry[key] ?? (key === 'compatibility' && entry.fit ? String(Number(entry.fit) * 2) : '');
+}
 function average(entries, key) {
-  const values = entries.map(entry => entry[key]).filter(value => value !== '' && value != null).map(Number);
+  const values = entries.map(entry => scoutRating(entry, key)).filter(value => value !== '' && value != null).map(Number);
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
 }
 function renderScoutRows() {
@@ -699,7 +681,7 @@ function renderScoutRows() {
     teams.get(entry.team).push(entry);
   }
   const rows = [...teams].map(([team, entries]) => ({
-    team, entries, points: average(entries, 'points'), fit: average(entries, 'fit')
+    team, entries, ...Object.fromEntries(ratingKeys.map(key => [key, average(entries, key)]))
   }));
   const sort = byId('scoutSort').value;
   rows.sort((a, b) => {
@@ -710,12 +692,12 @@ function renderScoutRows() {
   body.replaceChildren();
   if (!rows.length) {
     const cell = body.insertRow().insertCell();
-    cell.colSpan = 4;
+    cell.colSpan = 6;
     cell.textContent = 'No scouting entries yet.';
   }
-  for (const {team, points, fit, entries} of rows) {
+  for (const {team, entries, ...ratings} of rows) {
     const row = body.insertRow();
-    for (const value of [team, points?.toFixed(1) ?? '—', fit?.toFixed(1) ?? '—']) {
+    for (const value of [team, ...ratingKeys.map(key => ratings[key]?.toFixed(1) ?? '—')]) {
       row.insertCell().textContent = value;
     }
     const details = document.createElement('details');
@@ -724,16 +706,14 @@ function renderScoutRows() {
     details.append(summary);
     for (const entry of entries) {
       const info = document.createElement('p');
-      const fields = scoutControls.filter(control => control.name !== 'team' && entry[control.name]);
-      info.textContent = fields.map(control => control.labels[0].firstChild.textContent.trim() + ': ' + entry[control.name]).join('\n');
+      const fields = scoutControls.filter(control => control.name !== 'team' && scoutRating(entry, control.name));
+      info.textContent = fields.map(control => control.labels[0].firstChild.textContent.trim() + ': ' + scoutRating(entry, control.name)).join('\n');
       const edit = document.createElement('button');
       edit.textContent = 'Edit entry';
       edit.onclick = () => {
         editingScoutId = entry.id;
-        route = structuredClone(entry.route ?? []);
-        byId('routePlanner').open = Boolean(route.length);
-        paintRoute();
-        for (const control of scoutControls) control.value = entry[control.name] ?? '';
+
+        for (const control of scoutControls) control.value = scoutRating(entry, control.name);
         updateScoutFields();
         byId('saveScout').textContent = 'Update entry';
         byId('resetScout').hidden = false;
@@ -777,9 +757,9 @@ scoutForm.onsubmit = async event => {
     scoutStatus.textContent = 'Enter a team number.';
     return;
   }
-  entry.route = structuredClone(route);
+  const previous = scoutingEntries.find(item => item.id === editingScoutId);
   entry.id = editingScoutId ?? crypto.randomUUID();
-  if (await saveScoutEntries([entry], 'Saved entry for ' + entry.team + '.')) resetScoutForm();
+  if (await saveScoutEntries([{...previous, ...entry, match: entry.match ?? ''}], 'Saved entry for ' + entry.team + '.')) resetScoutForm();
 };
 byId('exportScout').onclick = async () => {
   try {
@@ -808,10 +788,14 @@ byId('importScout').onchange = async event => {
       if (ids.has(item.id)) continue;
       ids.add(item.id);
       const entry = {id: item.id};
+      for (const key of ['fit','points','partner','result','alliance','short','tall','yellow','toggles','loads','midfield','backup','attempts','claim','auton','driver','role']) {
+        if (typeof item[key] === 'string') entry[key] = item[key];
+      }
+      if (!/^[1-5]$/.test(entry.fit ?? '')) delete entry.fit;
       for (const control of scoutControls) {
         const value = item[control.name];
         if (typeof value !== 'string') continue;
-        if (control.type === 'number' && value !== '' && (!Number.isSafeInteger(Number(value)) || Number(value) < 0)) continue;
+        if (control.type === 'number' && value !== '' && (!Number.isSafeInteger(Number(value)) || Number(value) < 1 || Number(value) > 10)) continue;
         if (control.tagName === 'SELECT' && ![...control.options].some(option => option.value === value)) continue;
         entry[control.name] = value.trim();
       }
@@ -823,10 +807,10 @@ byId('importScout').onchange = async event => {
     await saveScoutEntries(entries, 'Imported ' + entries.length + ' new entries.');
   } catch (error) { reportScoutError(error); }
 };
-const routeField = byId('routeField');
-let route = [];
-let routePointer = null;
-let routeCursor = [0.5, 0.5];
+const plannerFrame = byId('lemLibPlanner');
+byId('routePlanner').ontoggle = event => {
+  if (event.target.open && !plannerFrame.hasAttribute('src')) plannerFrame.src = plannerFrame.dataset.src;
+};
 
 function validateRoute(value) {
   if (!Array.isArray(value) || value.length > 200) return [];
@@ -893,52 +877,9 @@ function drawField(canvas, strokes, cursor) {
   }
   ctx.restore();
 }
-function paintRoute() {
-  drawField(routeField, route, routeField === document.activeElement ? routeCursor : null);
-  byId('routeUndo').disabled = byId('routeClear').disabled = !route.length;
-}
-function fieldPoint(event) {
-  const bounds = routeField.getBoundingClientRect();
-  const coordinate = fraction => Math.max(0, Math.min(1, (fraction * 600 - 10) / 580));
-  return [coordinate((event.clientX - bounds.left) / bounds.width),
-    coordinate((event.clientY - bounds.top) / bounds.height)];
-}
-routeField.onpointerdown = event => {
-  if (event.button !== 0 || routePointer !== null || route.length >= 200) return;
-  event.preventDefault();
-  routePointer = event.pointerId;
-  routeField.setPointerCapture(routePointer);
-  route.push([fieldPoint(event)]);
-  paintRoute();
-};
-routeField.onpointermove = event => {
-  if (routePointer !== event.pointerId) return;
-  const stroke = route.at(-1);
-  if (!stroke || stroke.length >= 1000) return;
-  const point = fieldPoint(event);
-  const last = stroke.at(-1);
-  if (Math.hypot(point[0] - last[0], point[1] - last[1]) < .004) return;
-  stroke.push(point);
-  paintRoute();
-};
-routeField.onlostpointercapture = () => { routePointer = null; };
-routeField.onfocus = routeField.onblur = paintRoute;
-routeField.onkeydown = event => {
-  const offsets = {ArrowLeft: [-1,0], ArrowRight: [1,0], ArrowUp: [0,-1], ArrowDown: [0,1]};
-  if (event.key === 'Enter') {
-    event.preventDefault();
-    if (route.length < 200) route.push([routeCursor]);
-  } else if (offsets[event.key]) {
-    event.preventDefault();
-    routeCursor = routeCursor.map((value, index) => Math.max(0, Math.min(1, value + offsets[event.key][index] * .025)));
-  } else return;
-  paintRoute();
-};
-byId('routeUndo').onclick = () => { route.pop(); paintRoute(); };
-byId('routeClear').onclick = () => { route = []; paintRoute(); };
-paintRoute();
 </script>
 </html>
+
 
 
 
