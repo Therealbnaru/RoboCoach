@@ -37,7 +37,7 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 .review-expanded .review-divider{display:none}
 .review-expanded #status{grid-area:3/1/4/-1;margin:0}
 @media(max-width:540px){#videoReview.review-expanded{grid-template-columns:90px minmax(0,1fr);padding:6px;gap:6px}.review-expanded .annotation-tools{padding:5px}.review-expanded .annotation-tools button{padding:6px;font-size:13px}.review-expanded .playback-tools .track{min-width:65px}}
-.volume-control{display:flex;align-items:center;gap:6px;font-size:13px}.volume-control input{width:84px;accent-color:#b9f47e}main.scouting-active #profile{grid-column:1;grid-row:2}canvas.drawing.erasing{cursor:cell}.auto-select{align-self:start;padding:8px;border:1px solid #56565e;border-radius:5px}.auto-select summary{cursor:pointer}.auto-select div{max-height:170px;overflow:auto}.scout-form .auto-select label{display:flex;align-items:center;padding:5px 0}.scout-form .auto-select input{width:auto}.scout-column{min-width:0}.scout-column .scout-actions{margin-top:16px}.scout-column .scout-results{max-height: min(440px,55vh);overflow:auto;border:1px solid #46464b;border-radius:6px}.scout-column .scout-results th{position:sticky;top:0;background:#252526;z-index:1}.scout-column .scout-actions select{max-width:100%}</style>
+.volume-control{display:flex;align-items:center;gap:6px;font-size:13px}.volume-control input{width:84px;accent-color:#b9f47e}main.scouting-active #profile{grid-column:1;grid-row:2}canvas.drawing.erasing{cursor:cell}.auto-select{align-self:start;padding:8px;border:1px solid #56565e;border-radius:5px}.auto-select summary{cursor:pointer}.auto-select div{max-height:170px;overflow:auto}.scout-form .auto-select label{display:flex;align-items:center;padding:5px 0}.scout-form .auto-select input{width:auto}.scout-column{min-width:0}.scout-column .scout-actions{margin-top:16px}.scout-column .scout-results{max-height: min(440px,55vh);overflow:auto;border:1px solid #46464b;border-radius:6px}.scout-column .scout-results th{position:sticky;top:0;background:#252526;z-index:1}.scout-column .scout-actions select{max-width:100%}#scoutResultPanel.results-expanded{position:fixed;inset:0;z-index:110;background:#1e1e1e;padding:16px;display:flex;flex-direction:column;overflow:auto}#scoutResultPanel.results-expanded .scout-actions{margin-top:0}#scoutResultPanel.results-expanded .scout-results{flex:1;min-height:0;max-height:none}</style>
 <main>
 <header><nav class="tools" aria-label="RoboCoach views"><button id="reviewView" aria-pressed="true">Video Review</button><button id="scoutView" aria-pressed="false">Scouting View</button><button id="profileView" aria-pressed="false">Profile</button></nav><label class="open" for="file">Open video</label><input id="file" type="file" accept="video/*" multiple hidden></header>
 <aside class="library" aria-label="Match library">
@@ -85,7 +85,7 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 <details class="auto-select"><summary>Autos to run against them</summary><div id="autosAgainst"></div></details>
 <div class="tools wide"><button type="submit" id="saveScout">Save entry</button><button type="button" id="resetScout" hidden>Cancel edit</button></div>
 </form>
-<div class="tools scout-actions">
+<section id="scoutResultPanel" aria-label="Scouting results"><div class="tools scout-actions"><button type="button" id="scoutFullscreen" aria-pressed="false">Fullscreen results</button>
 <label>Event <select id="scoutEvent"></select></label>
 <label>Sort teams by <select id="scoutSort"><option value="autonomous">Average autonomous</option><option value="scoring">Average scoring</option><option value="driving">Average game sense / driving</option><option value="compatibility">Average compatibility</option><option value="skillsRank">World Skills rank</option><option value="team">Team number</option></select></label>
 <label class="open" for="importSkills">Import World Skills CSV</label><input id="importSkills" type="file" accept=".csv,text/csv" hidden>
@@ -94,7 +94,7 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 <label class="open" for="importScout">Import entries</label><input id="importScout" type="file" accept=".json,application/json" hidden>
 </div>
 <p id="scoutStatus" class="hint" role="status">Entries are saved in this browser. Use export and import to combine scouts’ entries across devices.</p>
-<div class="scout-results" tabindex="0" role="region" aria-label="Scouting results"><table><thead><tr><th>Team</th><th>Scoring / 10</th><th>Driving / 10</th><th>Autonomous / 10</th><th>Compatibility / 10</th><th>World Skills rank</th><th>World Skills score</th><th>Entries</th></tr></thead><tbody id="scoutRows"></tbody></table></div>
+<div class="scout-results" tabindex="0" role="region" aria-label="Scouting results"><table><thead><tr><th>Team</th><th>Scoring / 10</th><th>Driving / 10</th><th>Autonomous / 10</th><th>Compatibility / 10</th><th>World Skills rank</th><th>World Skills score</th><th>Entries</th></tr></thead><tbody id="scoutRows"></tbody></table></div></section>
 </div>
 <section class="route-planner" id="scoutPlanner" aria-label="Field path planner">
 <h2>Field path planner</h2>
@@ -928,6 +928,35 @@ function average(entries, key) {
   const values = entries.map(entry => scoutRating(entry, key)).filter(value => value !== '' && value != null).map(Number);
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
 }
+const scoutResultPanel = byId('scoutResultPanel');
+const scoutFullscreen = byId('scoutFullscreen');
+function setResultsExpanded(expanded) {
+  scoutResultPanel.classList.toggle('results-expanded', expanded);
+  scoutFullscreen.textContent = expanded ? 'Exit fullscreen' : 'Fullscreen results';
+  scoutFullscreen.setAttribute('aria-pressed', String(expanded));
+}
+scoutFullscreen.onclick = async () => {
+  if (scoutResultPanel.classList.contains('results-expanded')) {
+    if (document.fullscreenElement === scoutResultPanel) await document.exitFullscreen();
+    else setResultsExpanded(false);
+    return;
+  }
+  setResultsExpanded(true);
+  try {
+    await scoutResultPanel.requestFullscreen?.();
+  } catch {
+    // Keep the full-window view when native fullscreen is unavailable.
+  }
+};
+document.addEventListener('fullscreenchange', () => {
+  if (scoutResultPanel.classList.contains('results-expanded')) {
+    setResultsExpanded(document.fullscreenElement === scoutResultPanel);
+  }
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && !document.fullscreenElement &&
+      scoutResultPanel.classList.contains('results-expanded')) setResultsExpanded(false);
+});
 const skillsStorageKey = 'robocoach.worldSkills';
 let skillsRanks = new Map();
 try {
