@@ -26,7 +26,7 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 .tree-children{margin-left:17px;padding-left:0;border-color:#414145}.library .hint{margin:10px 14px;color:#999;font-size:11px}.review{grid-column:2;grid-row:2;padding:18px 22px}
 @media(max-width:680px){main{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto 1fr}header,.review,.library{grid-column:1}header{grid-row:1}.review{grid-row:2;padding:12px}.library{grid-row:3;border-top:1px solid #37373d}}
 .library input.tree-rename{display:block;width:calc(100% - 20px);height:23px;margin:0 10px;padding:0 5px}.folder-heading{display:flex;align-items:center}.folder-heading .tree-folder,.folder-heading .tree-rename{flex:1;min-width:0}.library .remove-folder{flex:none;padding:0 9px;border:0;background:transparent;color:#bbb;font-size:17px;line-height:23px}.library .remove-folder:hover{color:white;background:#733838}.folder-heading.drop-target{outline:1px solid #60aaff;outline-offset:-1px;background:#094771}.tree-video[draggable=true]{cursor:grab}.scout-form,.scout-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.scout-form{max-width:850px;margin:16px 0}.scout-fields,.scout-form .wide{grid-column:1/-1}.scout-form label{display:grid;gap:4px;font-size:13px}.scout-form input,.scout-form select,.scout-form textarea,.scout-actions select{width:100%;min-width:0;padding:7px;color:inherit;background:#252526;border:1px solid #56565e;border-radius:4px;font:inherit;margin:0}.scout-actions select{width:auto}.scout-results{overflow:auto}.scout-results table{border-collapse:collapse;width:100%;text-align:left}.scout-results th,.scout-results td{padding:9px;border-bottom:1px solid #46464b;vertical-align:top}.scout-results details{min-width:135px}.scout-results p{white-space:pre-wrap}.scout-results button{padding:4px 8px}.scout-actions{margin-top:24px}main.scouting-active .library{display:none}main.scouting-active{grid-template-columns:minmax(0,1fr)}main.scouting-active header,main.scouting-active #scouting{grid-column:1}
-</style>
+.route-planner{border:1px solid #465363;border-radius:8px;padding:12px}.route-planner summary{cursor:pointer}.route-planner canvas{display:block;width:min(100%,480px);height:auto;touch-action:none;cursor:crosshair;margin:10px 0;border-radius:6px}.route-preview{display:block;width:min(100%,250px);height:auto;margin:8px 0}</style>
 <main>
 <header><nav class="tools" aria-label="RoboCoach views"><button id="reviewView" aria-pressed="true">Video Review</button><button id="scoutView" aria-pressed="false">Scouting View</button></nav><label class="open" for="file">Open video</label><input id="file" type="file" accept="video/*" multiple hidden></header>
 <aside class="library" aria-label="Match library">
@@ -86,6 +86,12 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 <label>Best alliance role<input name="role"></label>
 <label>Compatibility with our team<select name="fit"><option value="">Unrated</option><option value="5">5 — Excellent</option><option value="4">4 — Good</option><option value="3">3 — Mixed</option><option value="2">2 — Limited</option><option value="1">1 — Poor</option></select></label>
 <label class="wide">Partner needs, endgame plan, concerns or availability<textarea name="notes" rows="2"></textarea></label>
+<details class="wide route-planner" id="routePlanner">
+<summary>Field path planner</summary>
+<p class="hint">Tap to add a waypoint or drag to sketch a route. The first dot is the start.</p>
+<canvas id="routeField" width="720" height="720" tabindex="0" aria-label="Override practice field. Tap or drag to draw. Use arrow keys to move the cursor and Enter to add a waypoint."></canvas>
+<div class="tools"><button type="button" id="routeUndo" disabled>Undo</button><button type="button" id="routeClear" disabled>Clear route</button></div>
+</details>
 <div class="tools wide"><button type="submit" id="saveScout">Save entry</button><button type="button" id="resetScout" hidden>Cancel edit</button></div>
 </form>
 <div class="tools scout-actions">
@@ -662,6 +668,8 @@ function resetScoutForm() {
   const {event, scout} = scoutForm.elements;
   const context = [event.value, scout.value];
   scoutForm.reset();
+  route = [];
+  paintRoute();
   [event.value, scout.value] = context;
   updateScoutFields();
   byId('saveScout').textContent = 'Save entry';
@@ -722,13 +730,25 @@ function renderScoutRows() {
       edit.textContent = 'Edit entry';
       edit.onclick = () => {
         editingScoutId = entry.id;
+        route = structuredClone(entry.route ?? []);
+        byId('routePlanner').open = Boolean(route.length);
+        paintRoute();
         for (const control of scoutControls) control.value = entry[control.name] ?? '';
         updateScoutFields();
         byId('saveScout').textContent = 'Update entry';
         byId('resetScout').hidden = false;
         scoutForm.elements.team.focus();
       };
-      details.append(info, edit);
+      details.append(info);
+      if (entry.route?.length) {
+        const preview = document.createElement('canvas');
+        preview.width = preview.height = 720;
+        preview.className = 'route-preview';
+        preview.setAttribute('aria-label', 'Saved field route');
+        drawField(preview, entry.route);
+        details.append(preview);
+      }
+      details.append(edit);
     }
     row.insertCell().append(details);
   }
@@ -757,6 +777,7 @@ scoutForm.onsubmit = async event => {
     scoutStatus.textContent = 'Enter a team number.';
     return;
   }
+  entry.route = structuredClone(route);
   entry.id = editingScoutId ?? crypto.randomUUID();
   if (await saveScoutEntries([entry], 'Saved entry for ' + entry.team + '.')) resetScoutForm();
 };
@@ -796,13 +817,129 @@ byId('importScout').onchange = async event => {
       }
       entry.team = item.team.trim().toUpperCase();
       if (entry.kind === 'Pit interview') delete entry.points;
+      entry.route = validateRoute(item.route);
       entries.push(entry);
     }
     await saveScoutEntries(entries, 'Imported ' + entries.length + ' new entries.');
   } catch (error) { reportScoutError(error); }
 };
+const routeField = byId('routeField');
+let route = [];
+let routePointer = null;
+let routeCursor = [0.5, 0.5];
+
+function validateRoute(value) {
+  if (!Array.isArray(value) || value.length > 200) return [];
+  return value.filter(stroke => Array.isArray(stroke) && stroke.length > 0 && stroke.length <= 1000 &&
+    stroke.every(point => Array.isArray(point) && point.length === 2 &&
+      point.every(coordinate => Number.isFinite(coordinate) && coordinate >= 0 && coordinate <= 1)));
+}
+function drawField(canvas, strokes, cursor) {
+  const ctx = canvas.getContext('2d');
+  ctx.save();
+  ctx.scale(canvas.width / 600, canvas.height / 600);
+  ctx.fillStyle = '#707882';
+  ctx.fillRect(0, 0, 600, 600);
+  function line(points, color, width) {
+    ctx.beginPath();
+    points.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.lineCap = ctx.lineJoin = 'round';
+    ctx.stroke();
+  }
+  function dot(x, y, radius, color) {
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+  for (let i = 100; i < 600; i += 100) {
+    line([[i, 0], [i, 600]], '#9299a0', 1);
+    line([[0, i], [600, i]], '#9299a0', 1);
+  }
+  line([[300, 200], [400, 300], [300, 400], [200, 300], [300, 200]], '#e9ebee', 3);
+  for (const [x, y, endX, endY] of [[45,45,250,250],[555,45,350,250],[45,555,250,350],[555,555,350,350]]) {
+    line([[x,y],[endX,endY]], '#e9ebee', 3);
+  }
+  for (const [x, y, color] of [[100,200,'#ffcb54'],[200,100,'#ffcb54'],[400,100,'#63b9ff'],[500,200,'#63b9ff'],[100,400,'#ff7272'],[200,500,'#ff7272'],[400,500,'#ffcb54'],[500,400,'#ffcb54'],[300,300,'#ffcb54']]) {
+    dot(x, y, 13, '#232a33');
+    dot(x, y, 8, color);
+  }
+  for (const [x, color] of [[8,'#b92e43'],[520,'#135b9c']]) {
+    for (const y of [22, 538]) {
+      ctx.fillStyle = color;
+      ctx.fillRect(x, y, 72, 40);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 12px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText('LOADER', x + 36, y + 24);
+    }
+  }
+  const points = strokes.flat().map(([x, y]) => [10 + x * 580, 10 + y * 580]);
+  if (points.length) {
+    line(points, '#173323', 10);
+    line(points, '#b9f47e', 5);
+    for (const stroke of strokes) {
+      const [x,y] = stroke[0];
+      dot(10 + x * 580, 10 + y * 580, 5, '#e9ffc9');
+    }
+    dot(...points.at(-1), 7, '#ffd36e');
+    dot(...points[0], 8, '#40e398');
+  }
+  if (cursor) {
+    const [x,y] = cursor;
+    dot(10 + x * 580, 10 + y * 580, 4, '#fff');
+  }
+  ctx.restore();
+}
+function paintRoute() {
+  drawField(routeField, route, routeField === document.activeElement ? routeCursor : null);
+  byId('routeUndo').disabled = byId('routeClear').disabled = !route.length;
+}
+function fieldPoint(event) {
+  const bounds = routeField.getBoundingClientRect();
+  const coordinate = fraction => Math.max(0, Math.min(1, (fraction * 600 - 10) / 580));
+  return [coordinate((event.clientX - bounds.left) / bounds.width),
+    coordinate((event.clientY - bounds.top) / bounds.height)];
+}
+routeField.onpointerdown = event => {
+  if (event.button !== 0 || routePointer !== null || route.length >= 200) return;
+  event.preventDefault();
+  routePointer = event.pointerId;
+  routeField.setPointerCapture(routePointer);
+  route.push([fieldPoint(event)]);
+  paintRoute();
+};
+routeField.onpointermove = event => {
+  if (routePointer !== event.pointerId) return;
+  const stroke = route.at(-1);
+  if (!stroke || stroke.length >= 1000) return;
+  const point = fieldPoint(event);
+  const last = stroke.at(-1);
+  if (Math.hypot(point[0] - last[0], point[1] - last[1]) < .004) return;
+  stroke.push(point);
+  paintRoute();
+};
+routeField.onlostpointercapture = () => { routePointer = null; };
+routeField.onfocus = routeField.onblur = paintRoute;
+routeField.onkeydown = event => {
+  const offsets = {ArrowLeft: [-1,0], ArrowRight: [1,0], ArrowUp: [0,-1], ArrowDown: [0,1]};
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    if (route.length < 200) route.push([routeCursor]);
+  } else if (offsets[event.key]) {
+    event.preventDefault();
+    routeCursor = routeCursor.map((value, index) => Math.max(0, Math.min(1, value + offsets[event.key][index] * .025)));
+  } else return;
+  paintRoute();
+};
+byId('routeUndo').onclick = () => { route.pop(); paintRoute(); };
+byId('routeClear').onclick = () => { route = []; paintRoute(); };
+paintRoute();
 </script>
 </html>
+
 
 
 
