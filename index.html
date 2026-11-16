@@ -62,7 +62,7 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 <div class="scout-workspace"><form id="scoutForm" class="scout-form">
 <label>Entry type<select name="kind"><option>Match observation</option><option>Pit interview</option></select></label>
 <label>Team number<input name="team" required maxlength="30"></label>
-<label>Event<input name="event" maxlength="100"></label>
+<label>Event<select name="event"><option value="">No event</option></select><input id="newScoutEvent" aria-label="New event name" placeholder="New event name" maxlength="100" hidden></label>
 <label>Scout<input name="scout" maxlength="80"></label>
 <label id="matchFields">Match # / alliance color<input name="match"></label>
 <label>Scoring / 10<input name="scoring" type="number" min="1" max="10" step="1"></label>
@@ -73,17 +73,17 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 
 <div class="tools wide"><button type="submit" id="saveScout">Save entry</button><button type="button" id="resetScout" hidden>Cancel edit</button></div>
 </form>
-<section class="route-planner" aria-label="Field path planner">
+<section class="route-planner" id="scoutPlanner" aria-label="Field path planner">
 <h2>Field path planner</h2>
 <div class="tools" id="routeTabs" aria-label="Routes"></div>
 <div class="tools route-fields">
 <label>Route name <input id="routeName" maxlength="80" placeholder="split auto"></label>
 <label>Alliance color <select id="routeAlliance"><option value="">Choose color</option><option value="red">Red</option><option value="blue">Blue</option></select></label>
 </div>
-<p class="hint">Tap to add waypoints or drag to draw. Save the scouting entry to keep all three routes.</p>
+<p class="hint">Tap to add waypoints, drag a node to move it, or drag from open field to draw. Ctrl+Z undoes your last change. Save the scouting entry to keep all three routes.</p>
 <div class="scout-field">
 <img src="https://yl-loaf.github.io/vex-path-planner/field.jpg" alt="Overhead Override field">
-<canvas id="scoutField" width="800" height="800" aria-label="Draw the selected route"></canvas>
+<canvas id="scoutField" tabindex="0" width="800" height="800" aria-label="Draw the selected route"></canvas>
 </div>
 <div class="tools"><button type="button" id="undoScoutRoute">Undo</button><button type="button" id="clearScoutRoute">Clear route</button><button id="downloadRoute" type="button" hidden>Download attached route</button></div>
 </section></div>
@@ -626,6 +626,20 @@ clear.onclick = () => {
 };
 const scoutForm = byId('scoutForm');
 const scoutEvent = byId('scoutEvent');
+const eventInput = scoutForm.elements.event;
+const newEvent = byId('newScoutEvent');
+const addEventValue = '__robocoach_new_event__';
+eventInput.onchange = () => {
+  newEvent.hidden = eventInput.value !== addEventValue;
+  if (!newEvent.hidden) newEvent.focus();
+};
+function setEventOptions(names, selected) {
+  const options = [...new Set([...names, selected].filter(name => name && name !== addEventValue))].sort();
+  eventInput.replaceChildren(new Option('No event', ''), ...options.map(name => new Option(name)), new Option('Add new event…', addEventValue));
+  eventInput.value = selected;
+  newEvent.hidden = selected !== addEventValue;
+}
+setEventOptions([], '');
 const scoutStatus = byId('scoutStatus');
 let scoutingEntries = [];
 let editingScoutId;
@@ -662,6 +676,7 @@ function resetScoutForm() {
   setScoutRoutes();
 
   [event.value, scout.value] = context;
+  newEvent.hidden = event.value !== addEventValue;
   updateScoutFields();
   byId('saveScout').textContent = 'Save entry';
   byId('resetScout').hidden = true;
@@ -676,6 +691,7 @@ async function refreshScouting() {
   const events = [...new Set(scoutingEntries.map(entry => entry.event).filter(Boolean))].sort();
   scoutEvent.replaceChildren(new Option('All events', ''), ...events.map(name => new Option(name)));
   scoutEvent.value = events.includes(event) ? event : '';
+  setEventOptions(events, eventInput.value);
   renderScoutRows();
 }
 const ratingKeys = ['scoring', 'driving', 'autonomous', 'compatibility'];
@@ -715,9 +731,19 @@ function renderScoutRows() {
     }
     const details = document.createElement('details');
     const summary = document.createElement('summary');
-    summary.textContent = entries.length + (entries.length === 1 ? ' entry' : ' entries');
+    const history = scoutingEntries.filter(entry => entry.team === team)
+      .sort((a, b) => (a.event ?? '').localeCompare(b.event ?? ''));
+    summary.textContent = history.length + (history.length === 1 ? ' entry across all events' : ' entries across all events');
     details.append(summary);
-    for (const entry of entries) {
+    let lastEvent;
+    for (const entry of history) {
+      const eventName = entry.event || 'No event';
+      if (eventName !== lastEvent) {
+        const heading = document.createElement('h3');
+        heading.textContent = eventName;
+        details.append(heading);
+        lastEvent = eventName;
+      }
       const info = document.createElement('p');
       const fields = scoutControls.filter(control => control.name !== 'team' && scoutRating(entry, control.name));
       info.textContent = fields.map(control => control.labels[0].firstChild.textContent.trim() + ': ' + scoutRating(entry, control.name)).join('\n');
@@ -728,6 +754,7 @@ function renderScoutRows() {
         setScoutRoutes(entry.autonRoutes);
 
         for (const control of scoutControls) control.value = scoutRating(entry, control.name);
+        newEvent.hidden = true;
         updateScoutFields();
         byId('saveScout').textContent = 'Update entry';
         byId('resetScout').hidden = false;
@@ -765,7 +792,20 @@ function renderScoutRows() {
           details.append(preview);
         }
       }
-      details.append(edit);
+      const remove = document.createElement('button');
+      remove.textContent = 'Delete entry';
+      remove.onclick = async () => {
+        if (scoutBusy || !confirm('Delete this scouting entry for ' + entry.team + '?')) return;
+        scoutBusy = true;
+        try {
+          await write([['scouting', undefined, entry.id]]);
+          if (editingScoutId === entry.id) resetScoutForm();
+          await refreshScouting();
+          scoutStatus.textContent = 'Deleted entry for ' + entry.team + '.';
+        } catch (error) { reportScoutError(error); }
+        finally { scoutBusy = false; }
+      };
+      details.append(edit, ' ', remove);
     }
     row.insertCell().append(details);
   }
@@ -789,6 +829,14 @@ async function saveScoutEntries(entries, message) {
 scoutForm.onsubmit = async event => {
   event.preventDefault();
   const entry = Object.fromEntries([...new FormData(scoutForm)].map(([key, value]) => [key, value.trim()]));
+  if (entry.event === addEventValue) {
+    entry.event = newEvent.value.trim();
+    if (!entry.event || entry.event === addEventValue) {
+      scoutStatus.textContent = 'Enter a name for the new event.';
+      newEvent.focus();
+      return;
+    }
+  }
   entry.team = entry.team.toUpperCase();
   if (!entry.team) {
     scoutStatus.textContent = 'Enter a team number.';
@@ -797,7 +845,11 @@ scoutForm.onsubmit = async event => {
   const previous = scoutingEntries.find(item => item.id === editingScoutId);
   entry.autonRoutes = structuredClone(scoutRoutes);
   entry.id = editingScoutId ?? crypto.randomUUID();
-  if (await saveScoutEntries([{...previous, ...entry, match: entry.match ?? ''}], 'Saved entry for ' + entry.team + '.')) resetScoutForm();
+    if (await saveScoutEntries([{...previous, ...entry, match: entry.match ?? ''}], 'Saved entry for ' + entry.team + '.')) {
+    eventInput.value = entry.event;
+    newEvent.value = '';
+    resetScoutForm();
+  }
 };
 byId('exportScout').onclick = async () => {
   try {
@@ -834,7 +886,7 @@ byId('importScout').onchange = async event => {
         const value = item[control.name];
         if (typeof value !== 'string') continue;
         if (control.type === 'number' && value !== '' && (!Number.isSafeInteger(Number(value)) || Number(value) < 1 || Number(value) > 10)) continue;
-        if (control.tagName === 'SELECT' && ![...control.options].some(option => option.value === value)) continue;
+        if (control.tagName === 'SELECT' && control.name !== 'event' && ![...control.options].some(option => option.value === value)) continue;
         entry[control.name] = value.trim();
       }
       entry.team = item.team.trim().toUpperCase();
@@ -848,6 +900,7 @@ byId('importScout').onchange = async event => {
 };
 let scoutRoutes = normalizeScoutRoutes();
 let selectedRoute = 0;
+let routeHistory = scoutRoutes.map(() => []);
 const scoutField = byId('scoutField');
 let routeGesture;
 const routeName = byId('routeName');
@@ -894,6 +947,7 @@ function renderRouteTabs() {
 }
 function setScoutRoutes(value) {
   scoutRoutes = normalizeScoutRoutes(value);
+  routeHistory = scoutRoutes.map(() => []);
   selectedRoute = 0;
   routeGesture = undefined;
   renderRouteTabs();
@@ -909,36 +963,69 @@ routeAlliance.onchange = () => {
 function paintScoutRoute() {
   const strokes = scoutRoutes[selectedRoute].strokes;
   drawField(scoutField, strokes, true);
-  byId('undoScoutRoute').disabled = byId('clearScoutRoute').disabled = !strokes.length;
+  byId('undoScoutRoute').disabled = !routeHistory[selectedRoute].length;
+  byId('clearScoutRoute').disabled = !strokes.length;
 }
 function scoutFieldPoint(event) {
   const box = scoutField.getBoundingClientRect();
   const normalize = value => Math.max(0, Math.min(1, (600 * value - 10) / 580));
   return [normalize((event.clientX - box.left) / box.width), normalize((event.clientY - box.top) / box.height)];
 }
+function rememberRoute() {
+  const history = routeHistory[selectedRoute];
+  history.push(structuredClone(scoutRoutes[selectedRoute].strokes));
+  if (history.length > 50) history.shift();
+}
 scoutField.onpointerdown = event => {
   const strokes = scoutRoutes[selectedRoute].strokes;
-  if (event.button !== 0 || routeGesture || strokes.length >= 200) return;
-  const stroke = [scoutFieldPoint(event)];
+  if (event.button !== 0 || routeGesture) return;
+  const point = scoutFieldPoint(event);
+  const width = scoutField.getBoundingClientRect().width;
+  const existing = strokes.findLast(stroke =>
+    Math.hypot(point[0] - stroke[0][0], point[1] - stroke[0][1]) * width < 13);
+  if (!existing && strokes.length >= 200) return;
+  scoutField.focus();
   scoutField.setPointerCapture(event.pointerId);
-  routeGesture = {id: event.pointerId, stroke};
-  strokes.push(stroke);
+  const stroke = existing ?? [point];
+  routeGesture = {id: event.pointerId, stroke, existing, moved: false};
+  if (!existing) {
+    rememberRoute();
+    strokes.push(stroke);
+  }
   paintScoutRoute();
 };
 scoutField.onpointermove = event => {
-  if (routeGesture?.id !== event.pointerId || routeGesture.stroke.length >= 1000) return;
+  if (routeGesture?.id !== event.pointerId) return;
+  const {stroke, existing} = routeGesture;
   const point = scoutFieldPoint(event);
-  const last = routeGesture.stroke.at(-1);
+  const last = existing ? stroke[0] : stroke.at(-1);
   if (Math.hypot(point[0] - last[0], point[1] - last[1]) < .004) return;
-  routeGesture.stroke.push(point);
+  if (existing) {
+    if (!routeGesture.moved) rememberRoute();
+    routeGesture.moved = true;
+    stroke[0] = point;
+  } else if (stroke.length < 1000) {
+    stroke.push(point);
+  }
   paintScoutRoute();
 };
 scoutField.onlostpointercapture = () => { routeGesture = undefined; };
-byId('undoScoutRoute').onclick = () => {
-  scoutRoutes[selectedRoute].strokes.pop();
+function undoScoutRoute() {
+  if (routeGesture) return;
+  const previous = routeHistory[selectedRoute].pop();
+  if (previous) scoutRoutes[selectedRoute].strokes = previous;
   paintScoutRoute();
-};
+}
+byId('undoScoutRoute').onclick = undoScoutRoute;
+byId('scouting').addEventListener('keydown', event => {
+  if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.key.toLowerCase() !== 'z' ||
+      event.target.closest('input, textarea, select, [contenteditable]')) return;
+  if (!routeHistory[selectedRoute].length) return;
+  event.preventDefault();
+  undoScoutRoute();
+});
 byId('clearScoutRoute').onclick = () => {
+  rememberRoute();
   scoutRoutes[selectedRoute].strokes = [];
   paintScoutRoute();
 };
@@ -1022,6 +1109,7 @@ function drawField(canvas, strokes, overlay = false) {
 }
 </script>
 </html>
+
 
 
 
