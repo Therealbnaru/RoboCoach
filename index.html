@@ -37,9 +37,9 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 .review-expanded .review-divider{display:none}
 .review-expanded #status{grid-area:3/1/4/-1;margin:0}
 @media(max-width:540px){#videoReview.review-expanded{grid-template-columns:90px minmax(0,1fr);padding:6px;gap:6px}.review-expanded .annotation-tools{padding:5px}.review-expanded .annotation-tools button{padding:6px;font-size:13px}.review-expanded .playback-tools .track{min-width:65px}}
-</style>
+.volume-control{display:flex;align-items:center;gap:6px;font-size:13px}.volume-control input{width:84px;accent-color:#b9f47e}main.scouting-active #profile{grid-column:1;grid-row:2}</style>
 <main>
-<header><nav class="tools" aria-label="RoboCoach views"><button id="reviewView" aria-pressed="true">Video Review</button><button id="scoutView" aria-pressed="false">Scouting View</button></nav><label class="open" for="file">Open video</label><input id="file" type="file" accept="video/*" multiple hidden></header>
+<header><nav class="tools" aria-label="RoboCoach views"><button id="reviewView" aria-pressed="true">Video Review</button><button id="scoutView" aria-pressed="false">Scouting View</button><button id="profileView" aria-pressed="false">Profile</button></nav><label class="open" for="file">Open video</label><input id="file" type="file" accept="video/*" multiple hidden></header>
 <aside class="library" aria-label="Match library">
 <div class="explorer-title"><h2>Explorer</h2><button id="newFolder" title="New folder" aria-label="New folder">＋</button></div><div class="explorer-root">⌄ &nbsp; ROBOCOACH</div>
 <div class="tools">
@@ -52,7 +52,7 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 <section class="review" id="videoReview" aria-label="Video review">
 <div class="stage"><video id="video" playsinline preload="metadata"></video><canvas id="ink" aria-label="Freehand drawing overlay"></canvas><div id="empty" class="empty">Open a match video to start.</div></div>
 <div class="tools playback-tools">
-<button id="play" disabled>Play</button><div class="track"><input class="seek" id="seek" aria-label="Video position" type="range" min="0" max="0" step="any" value="0" disabled><div id="timeline" class="timeline" aria-label="Annotation markers"></div></div><output id="time">0:00 / 0:00</output><button id="fullscreenReview" type="button" aria-pressed="false">Fullscreen</button>
+<button id="play" disabled>Play</button><div class="track"><input class="seek" id="seek" aria-label="Video position" type="range" min="0" max="0" step="any" value="0" disabled><div id="timeline" class="timeline" aria-label="Annotation markers"></div></div><output id="time">0:00 / 0:00</output><label class="volume-control">Volume <input id="reviewVolume" type="range" min="0" max="100" value="100"></label><button id="fullscreenReview" type="button" aria-pressed="false">Fullscreen</button>
 </div>
 <hr class="review-divider" style="border:0;border-top:1px solid #35404d;margin:16px 0">
 <div class="tools annotation-tools" role="group" aria-label="Annotations">
@@ -105,6 +105,19 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 </div>
 <p id="scoutStatus" class="hint" role="status">Entries are saved in this browser. Use export and import to combine scouts’ entries across devices.</p>
 <div class="scout-results"><table><thead><tr><th>Team</th><th>Scoring / 10</th><th>Driving / 10</th><th>Autonomous / 10</th><th>Compatibility / 10</th><th>Entries</th></tr></thead><tbody id="scoutRows"></tbody></table></div>
+</section>
+<section class="review" id="profile" hidden aria-labelledby="profileTitle">
+<h1 id="profileTitle">Robot Profile</h1>
+<form class="scout-form" id="profileForm">
+<label>Team number<input name="team" maxlength="30"></label>
+<label>Team name<input name="teamName" maxlength="100"></label>
+<label>Robot name<input name="robot" maxlength="100"></label>
+<label>Drivetrain<input name="drivetrain" maxlength="100"></label>
+<label class="wide">Autonomous routines<textarea name="autonomous" rows="3"></textarea></label>
+<label class="wide">Scoring strengths and preferred alliance role<textarea name="strengths" rows="3"></textarea></label>
+<label class="wide">Notes<textarea name="notes" rows="3"></textarea></label>
+<div class="tools wide"><button type="submit">Save profile</button><span class="hint" id="profileStatus" role="status">Saved in this browser.</span></div>
+</form>
 </section></main>
 <script>
 const byId = id => document.getElementById(id);
@@ -731,21 +744,58 @@ let editingScoutId;
 let scoutBusy = false;
 const scoutControls = [...scoutForm.querySelectorAll('[name]')];
 
-function showScoutView(show) {
-  byId('scouting').hidden = !show;
-  document.querySelector('main').classList.toggle('scouting-active', show);
-  document.querySelector('.review').hidden = show;
-  document.querySelector('header .open').hidden = show;
-  byId('reviewView').setAttribute('aria-pressed', String(!show));
-  byId('scoutView').setAttribute('aria-pressed', String(show));
-  if (show) {
-    video.pause();
+function showView(view) {
+  byId('videoReview').hidden = view !== 'review';
+  byId('scouting').hidden = view !== 'scout';
+  byId('profile').hidden = view !== 'profile';
+  document.querySelector('main').classList.toggle('scouting-active', view !== 'review');
+  document.querySelector('header .open').hidden = view !== 'review';
+  for (const name of ['review', 'scout', 'profile']) {
+    byId(name + 'View').setAttribute('aria-pressed', String(name === view));
+  }
+  if (view !== 'review') video.pause();
+  if (view === 'scout') {
     refreshScouting().catch(reportScoutError);
     renderRouteTabs();
   }
 }
-byId('reviewView').onclick = () => showScoutView(false);
-byId('scoutView').onclick = () => showScoutView(true);
+for (const view of ['review', 'scout', 'profile']) {
+  byId(view + 'View').onclick = () => showView(view);
+}
+const volume = byId('reviewVolume');
+try {
+  const savedVolume = localStorage.getItem('robocoach.volume');
+  if (savedVolume !== null && Number.isFinite(Number(savedVolume))) {
+    video.volume = Math.max(0, Math.min(100, Number(savedVolume))) / 100;
+  }
+} catch {}
+volume.value = Math.round(video.volume * 100);
+volume.oninput = () => {
+  video.volume = Number(volume.value) / 100;
+  try { localStorage.setItem('robocoach.volume', volume.value); } catch {}
+};
+video.addEventListener('volumechange', () => { volume.value = Math.round(video.volume * 100); });
+
+const profileForm = byId('profileForm');
+const profileStatus = byId('profileStatus');
+try {
+  const savedProfile = JSON.parse(localStorage.getItem('robocoach.profile') ?? '{}');
+  for (const field of profileForm.querySelectorAll('[name]')) {
+    if (typeof savedProfile?.[field.name] === 'string') field.value = savedProfile[field.name];
+  }
+} catch {
+  profileStatus.textContent = 'Could not load the saved profile.';
+}
+profileForm.oninput = () => { profileStatus.textContent = 'Unsaved changes'; };
+profileForm.onsubmit = event => {
+  event.preventDefault();
+  try {
+    localStorage.setItem('robocoach.profile', JSON.stringify(Object.fromEntries(new FormData(profileForm))));
+    profileStatus.textContent = 'Profile saved in this browser.';
+  } catch {
+    profileStatus.textContent = 'Could not save the profile. Check browser storage.';
+  }
+};
 function updateScoutFields() {
   const pit = scoutForm.elements.kind.value === 'Pit interview';
   byId('matchFields').hidden = pit;
@@ -1210,6 +1260,7 @@ function drawField(canvas, strokes, overlay = false) {
 }
 </script>
 </html>
+
 
 
 
