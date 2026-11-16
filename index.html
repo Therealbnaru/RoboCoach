@@ -37,7 +37,7 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 .review-expanded .review-divider{display:none}
 .review-expanded #status{grid-area:3/1/4/-1;margin:0}
 @media(max-width:540px){#videoReview.review-expanded{grid-template-columns:90px minmax(0,1fr);padding:6px;gap:6px}.review-expanded .annotation-tools{padding:5px}.review-expanded .annotation-tools button{padding:6px;font-size:13px}.review-expanded .playback-tools .track{min-width:65px}}
-.volume-control{display:flex;align-items:center;gap:6px;font-size:13px}.volume-control input{width:84px;accent-color:#b9f47e}main.scouting-active #profile{grid-column:1;grid-row:2}canvas.drawing.erasing{cursor:cell}.auto-select{padding:8px;border:1px solid #56565e;border-radius:5px}.auto-select summary{cursor:pointer}.auto-select div{max-height:170px;overflow:auto}.scout-form .auto-select label{display:flex;align-items:center;padding:5px 0}.scout-form .auto-select input{width:auto}</style>
+.volume-control{display:flex;align-items:center;gap:6px;font-size:13px}.volume-control input{width:84px;accent-color:#b9f47e}main.scouting-active #profile{grid-column:1;grid-row:2}canvas.drawing.erasing{cursor:cell}.auto-select{align-self:start;padding:8px;border:1px solid #56565e;border-radius:5px}.auto-select summary{cursor:pointer}.auto-select div{max-height:170px;overflow:auto}.scout-form .auto-select label{display:flex;align-items:center;padding:5px 0}.scout-form .auto-select input{width:auto}</style>
 <main>
 <header><nav class="tools" aria-label="RoboCoach views"><button id="reviewView" aria-pressed="true">Video Review</button><button id="scoutView" aria-pressed="false">Scouting View</button><button id="profileView" aria-pressed="false">Profile</button></nav><label class="open" for="file">Open video</label><input id="file" type="file" accept="video/*" multiple hidden></header>
 <aside class="library" aria-label="Match library">
@@ -868,9 +868,12 @@ function cleanAutos(value) {
 function renderAutoChoices(entry) {
   const choices = normalizeScoutRoutes(savedProfileRoutes)
     .filter(route => route.name || route.color || route.strokes.length || route.file)
-    .map(route => routeTitle(route) + ' (Route ' + route.number + ')');
+    .map(route => routeTitle(route));
   for (const id of Object.keys(autoFields)) {
-    const picked = entry ? cleanAutos(entry[id]) : selectedAutos(id);
+    const picked = (entry ? cleanAutos(entry[id]) : selectedAutos(id)).map(title => {
+      const name = title.replace(/ \(Route \d+\)$/, '');
+      return choices.includes(name) ? name : title;
+    });
     const group = byId(id);
     group.replaceChildren();
     const options = [...new Set([...choices, ...picked])];
