@@ -75,12 +75,12 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 </form>
 <section class="route-planner" id="scoutPlanner" aria-label="Field path planner">
 <h2>Field path planner</h2>
-<div class="tools" id="routeTabs" aria-label="Routes"></div>
+<div class="tools"><div class="tools" id="routeTabs" role="group" aria-label="Routes"></div><button type="button" id="addScoutRoute">+ Route</button></div>
 <div class="tools route-fields">
 <label>Route name <input id="routeName" maxlength="80" placeholder="split auto"></label>
 <label>Alliance color <select id="routeAlliance"><option value="">Choose color</option><option value="red">Red</option><option value="blue">Blue</option></select></label>
 </div>
-<p class="hint">Use Draw to add waypoints or sketch. Switch to Move to drag existing nodes. Ctrl+Z undoes your last change. Save the scouting entry to keep all three routes.</p>
+<p class="hint">Use Draw to add waypoints or sketch. Switch to Move to drag existing nodes. Ctrl+Z undoes your last change. Save the scouting entry to keep your routes.</p>
 <div class="field-editor"><div class="field-tools" role="group" aria-label="Path editor tools"><button type="button" id="routeDraw" aria-pressed="true" title="Draw waypoints or strokes"><span aria-hidden="true">✎</span>Draw</button><button type="button" id="routeMove" aria-pressed="false" title="Move existing waypoints"><span aria-hidden="true">✥</span>Move</button></div><div class="scout-field">
 <img src="https://yl-loaf.github.io/vex-path-planner/field.jpg" alt="Overhead Override field">
 <canvas id="scoutField" tabindex="0" width="800" height="800" aria-label="Draw the selected route"></canvas>
@@ -916,7 +916,8 @@ const routeName = byId('routeName');
 const routeAlliance = byId('routeAlliance');
 
 function normalizeScoutRoutes(value) {
-  return Array.from({length: 3}, (_, index) => {
+  const count = Array.isArray(value) ? Math.max(3, value.length) : 3;
+  return Array.from({length: count}, (_, index) => {
     const item = value?.[index];
     const file = item?.file;
     return {
@@ -935,13 +936,12 @@ function routeTitle(item) {
 }
 function renderRouteTabs() {
   const tabs = byId('routeTabs');
-  if (!tabs.childElementCount) {
-    for (const index of scoutRoutes.keys()) {
-      const tab = document.createElement('button');
-      tab.type = 'button';
-      tab.onclick = () => { selectedRoute = index; renderRouteTabs(); };
-      tabs.append(tab);
-    }
+  while (tabs.childElementCount > scoutRoutes.length) tabs.lastElementChild.remove();
+  for (let index = tabs.childElementCount; index < scoutRoutes.length; index++) {
+    const tab = document.createElement('button');
+    tab.type = 'button';
+    tab.onclick = () => { selectedRoute = index; renderRouteTabs(); };
+    tabs.append(tab);
   }
   scoutRoutes.forEach((item, index) => {
     const tab = tabs.children[index];
@@ -954,6 +954,13 @@ function renderRouteTabs() {
   byId('downloadRoute').hidden = !item.file;
   paintScoutRoute();
 }
+byId('addScoutRoute').onclick = () => {
+  selectedRoute = scoutRoutes.length;
+  scoutRoutes.push({number: selectedRoute + 1, name: '', color: '', strokes: [], file: null});
+  routeHistory.push([]);
+  renderRouteTabs();
+  routeName.focus();
+};
 function setScoutRoutes(value) {
   scoutRoutes = normalizeScoutRoutes(value);
   routeHistory = scoutRoutes.map(() => []);
@@ -1118,6 +1125,7 @@ function drawField(canvas, strokes, overlay = false) {
 }
 </script>
 </html>
+
 
 
 
