@@ -52,7 +52,7 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 <section class="review" id="videoReview" aria-label="Video review">
 <div class="stage"><video id="video" playsinline preload="metadata"></video><video id="liveTabVideo" playsinline autoplay hidden aria-label="Live tab feed"></video><canvas id="frozenLiveFrame" aria-label="Frozen live frame" hidden></canvas><iframe id="youtubeVideo" title="YouTube match player" referrerpolicy="strict-origin-when-cross-origin" allow="encrypted-media; picture-in-picture; fullscreen" allowfullscreen hidden></iframe><canvas id="ink" aria-label="Freehand drawing overlay"></canvas><div id="empty" class="empty">Open a match video to start.</div></div>
 <div class="tools playback-tools">
-<button id="play" disabled>Play</button><div class="track"><input class="seek" id="seek" aria-label="Video position" type="range" min="0" max="0" step="any" value="0" disabled><div id="timeline" class="timeline" aria-label="Annotation markers"></div></div><output id="time">0:00 / 0:00</output><label class="volume-control">Volume <input id="reviewVolume" type="range" min="0" max="100" value="100"></label><button id="openYouTube" type="button">Open YouTube</button><button id="closeYouTube" type="button" hidden>Close YouTube</button><input id="liveSourceLink" type="url" aria-label="Source video link" placeholder="Source video link (optional)" hidden><button id="drawLiveTab" type="button" hidden aria-pressed="false">Draw live</button><button id="freezeLiveTab" type="button" hidden>Freeze &amp; Annotate</button><button id="shareLiveTab" type="button">Share live tab</button><button id="fullscreenReview" type="button" aria-pressed="false">Fullscreen</button>
+<button id="play" disabled>Play</button><div class="track"><input class="seek" id="seek" aria-label="Video position" type="range" min="0" max="0" step="any" value="0" disabled><div id="timeline" class="timeline" aria-label="Annotation markers"></div></div><output id="time">0:00 / 0:00</output><label class="volume-control">Volume <input id="reviewVolume" type="range" min="0" max="100" value="100"></label><button id="openYouTube" type="button">Open YouTube</button><button id="pauseYouTube" type="button" hidden disabled>Pause YouTube</button><button id="closeYouTube" type="button" hidden>Close YouTube</button><input id="liveSourceLink" type="url" aria-label="Source video link" placeholder="Source video link (optional)" hidden><button id="drawLiveTab" type="button" hidden aria-pressed="false">Draw live</button><button id="freezeLiveTab" type="button" hidden>Freeze &amp; Annotate</button><button id="shareLiveTab" type="button">Share live tab</button><button id="fullscreenReview" type="button" aria-pressed="false">Fullscreen</button>
 </div>
 <hr class="review-divider" style="border:0;border-top:1px solid #35404d;margin:16px 0">
 <div class="tools annotation-tools" role="group" aria-label="Annotations">
@@ -799,6 +799,15 @@ ink.onlostpointercapture = event => {
     saveAnnotations();
   }
 };
+document.addEventListener('keydown', event => {
+  if (byId('videoReview').hidden || undo.disabled || active ||
+      event.defaultPrevented || !(event.ctrlKey || event.metaKey) || event.shiftKey || event.altKey ||
+      event.key.toLowerCase() !== 'z' ||
+      event.target.closest('input, textarea, select, [contenteditable], dialog') ||
+      (!liveTabVideo.hidden && !drawingLive) || !youtubeVideo.hidden || !video.paused) return;
+  event.preventDefault();
+  undo.click();
+});
 undo.onclick = () => {
   const timestamp = frame();
   const strokes = visibleDrawings().get(timestamp);
@@ -1024,6 +1033,25 @@ function stopLiveTab(message = reviewHint) {
 }
 const youtubeDialog = byId('youtubeDialog');
 const youtubeVideo = byId('youtubeVideo');
+const pauseYouTube = byId('pauseYouTube');
+let youtubePlayer;
+let youtubeApi;
+let youtubeLoad = 0;
+function getYouTubeApi() {
+  if (window.YT?.Player) return Promise.resolve(window.YT);
+  return youtubeApi ??= new Promise((resolve, reject) => {
+    window.onYouTubeIframeAPIReady = () => resolve(window.YT);
+    const script = document.createElement('script');
+    script.src = 'https://www.youtube.com/iframe_api';
+    script.onerror = () => {
+      youtubeApi = undefined;
+      script.remove();
+      reject(new Error('YouTube controls unavailable'));
+    };
+    document.head.append(script);
+  });
+}
+pauseYouTube.onclick = () => youtubePlayer?.pauseVideo();
 const youtubeLink = byId('youtubeLink');
 function youtubeVideoId(value) {
   let url;
@@ -1040,6 +1068,9 @@ function youtubeVideoId(value) {
 }
 function stopYouTube() {
   if (youtubeVideo.hidden) return;
+  youtubeLoad++;
+  youtubePlayer = undefined;
+  pauseYouTube.hidden = pauseYouTube.disabled = true;
   youtubeVideo.hidden = true;
   youtubeVideo.removeAttribute('src');
   byId('videoReview').classList.remove('youtube-active');
@@ -1062,7 +1093,22 @@ byId('youtubeForm').onsubmit = event => {
   stopLiveTab();
   video.pause();
   setPen(false);
-  youtubeVideo.src = 'https://www.youtube.com/embed/' + id + '?playsinline=1';
+  const load = ++youtubeLoad;
+  youtubePlayer = undefined;
+  pauseYouTube.hidden = false;
+  pauseYouTube.disabled = true;
+  youtubeVideo.src = 'https://www.youtube.com/embed/' + id +
+    '?playsinline=1&enablejsapi=1&origin=' + encodeURIComponent(location.origin);
+  getYouTubeApi().then(api => {
+    if (load !== youtubeLoad) return;
+    new api.Player(youtubeVideo, {
+      events: {onReady(event) {
+        if (load !== youtubeLoad) return;
+        youtubePlayer = event.target;
+        pauseYouTube.disabled = false;
+      }}
+    });
+  }).catch(() => { /* The embedded player still has its own pause control. */ });
   youtubeVideo.hidden = false;
   byId('videoReview').classList.add('youtube-active');
   byId('closeYouTube').hidden = false;
