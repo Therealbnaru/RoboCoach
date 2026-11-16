@@ -25,9 +25,9 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 .chevron{width:6px;height:6px;flex:none;border-right:1px solid;border-top:1px solid;transform:rotate(45deg);margin-right:2px}.tree-folder[aria-expanded=true] .chevron{transform:rotate(135deg) translate(-1px,1px)}.folder-icon{position:relative;width:14px;height:9px;flex:none;background:#d5a85b;border-radius:1px}.folder-icon::before{content:'';position:absolute;top:-2px;left:0;width:6px;height:3px;background:inherit;border-radius:1px}.video-icon{color:#83b7e5;font-size:15px}
 .tree-children{margin-left:17px;padding-left:0;border-color:#414145}.library .hint{margin:10px 14px;color:#999;font-size:11px}.review{grid-column:2;grid-row:2;padding:18px 22px}
 @media(max-width:680px){main{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto 1fr}header,.review,.library{grid-column:1}header{grid-row:1}.review{grid-row:2;padding:12px}.library{grid-row:3;border-top:1px solid #37373d}}
-.library input.tree-rename{display:block;width:calc(100% - 20px);height:23px;margin:0 10px;padding:0 5px}</style>
+.library input.tree-rename{display:block;width:calc(100% - 20px);height:23px;margin:0 10px;padding:0 5px}.folder-heading{display:flex;align-items:center}.folder-heading .tree-folder,.folder-heading .tree-rename{flex:1;min-width:0}.library .remove-folder{flex:none;padding:0 9px;border:0;background:transparent;color:#bbb;font-size:17px;line-height:23px}.library .remove-folder:hover{color:white;background:#733838}.folder-heading.drop-target{outline:1px solid #60aaff;outline-offset:-1px;background:#094771}.tree-video[draggable=true]{cursor:grab}</style>
 <main>
-<header><h1>RoboCoach Video Review</h1><label class="open" for="file">Open video</label><input id="file" type="file" accept="video/*" hidden></header>
+<header><h1>RoboCoach Video Review</h1><label class="open" for="file">Open video</label><input id="file" type="file" accept="video/*" multiple hidden></header>
 <aside class="library" aria-label="Match library">
 <div class="explorer-title"><h2>Explorer</h2><button id="newFolder" title="New folder" aria-label="New folder">＋</button></div><div class="explorer-root">⌄ &nbsp; ROBOCOACH</div>
 <div class="tools">
@@ -143,12 +143,18 @@ function setPen(on) {
   ink.classList.toggle('drawing', on);
   if (on) video.pause();
 }
+const matchDragType = 'application/x-robocoach-match';
 const libraryTree = byId('libraryTree');
 const expanded = new Set(['Unfiled']);
 let selectedFolder = 'Unfiled';
 let switching = false;
 let savedFolders = [], savedMatches = [];
 const libraryStatus = byId('libraryStatus');
+for (const type of ['dragover', 'drop']) {
+  window.addEventListener(type, event => {
+    if (event.dataTransfer.types.includes('Files')) event.preventDefault();
+  });
+}
 let currentMatch;
 const database = new Promise((resolve, reject) => {
   const request = indexedDB.open('RoboCoachLibrary', 1);
@@ -300,7 +306,19 @@ function renderLibrary() {
       renderLibrary();
       [...libraryTree.querySelectorAll('.tree-folder')].find(row => row.dataset.selected === 'true')?.focus();
     }, folderLabel(name), next => renameFolder(name, next));
-    libraryTree.append(folder);
+    const heading = document.createElement('div');
+    heading.className = 'folder-heading';
+    heading.append(folder);
+    bindFolderDrop(heading, name);
+    if (name !== 'Unfiled') {
+      const remove = document.createElement('button');
+      remove.className = 'remove-folder';
+      remove.textContent = '×';
+      remove.title = remove.ariaLabel = 'Delete ' + folderLabel(name);
+      remove.onclick = () => deleteFolder(name);
+      heading.append(remove);
+    }
+    libraryTree.append(heading);
     if (!open) continue;
     const children = document.createElement('div');
     children.className = 'tree-children';
@@ -314,6 +332,11 @@ function renderLibrary() {
       bindExplorerRow(row, () => openSavedMatch(match), match.name, async name => {
         await write([['matches', {...match, name}]]);
         if (currentMatch?.id === match.id) currentMatch.name = name;
+      });
+      row.draggable = true;
+      row.addEventListener('dragstart', event => {
+        event.dataTransfer.setData(matchDragType, match.id);
+        event.dataTransfer.effectAllowed = 'move';
       });
       children.append(row);
     }
@@ -387,19 +410,76 @@ async function changeMatch(action) {
     switching = file.disabled = false;
   }
 }
-file.onchange = () => {
-  const blob = file.files[0];
-  if (!blob) return;
-  const match = {id: crypto.randomUUID(), name: blob.name, folder: selectedFolder};
-  file.value = '';
+function importVideos(blobs, folder) {
   return changeMatch(async () => {
-    await write([['matches', match], ['videos', blob, match.id]]);
-    loadMatch(match, blob);
-    expanded.add(match.folder);
+    const matches = blobs.map(blob => ({
+      id: crypto.randomUUID(), name: blob.name, folder
+    }));
+    await write(matches.flatMap((match, index) => [
+      ['matches', match], ['videos', blobs[index], match.id]
+    ]));
+    selectedFolder = folder;
+    expanded.add(folder);
+    loadMatch(matches[0], blobs[0]);
     await refreshLibrary();
-    libraryStatus.textContent = 'Video saved in ' + folderLabel(match.folder) + '.';
+    libraryStatus.textContent = 'Imported ' + matches.length + ' video(s) into ' + folderLabel(folder) + '.';
   });
+}
+file.onchange = () => {
+  const blobs = Array.from(file.files);
+  file.value = '';
+  if (blobs.length) importVideos(blobs, selectedFolder);
 };
+async function deleteFolder(name) {
+  return changeMatch(async () => {
+    const matches = savedMatches.filter(match => match.folder === name);
+    await write([
+      ['folders', undefined, name],
+      ...matches.map(match => ['matches', {...match, folder: 'Unfiled'}])
+    ]);
+    if (currentMatch?.folder === name) currentMatch.folder = 'Unfiled';
+    if (selectedFolder === name) selectedFolder = 'Unfiled';
+    expanded.delete(name);
+    expanded.add('Unfiled');
+    await refreshLibrary();
+    libraryStatus.textContent = matches.length
+      ? 'Folder deleted. Videos moved to ' + folderLabel('Unfiled') + '.'
+      : 'Folder deleted.';
+  });
+}
+function bindFolderDrop(heading, name) {
+  heading.ondragover = event => {
+    const types = event.dataTransfer.types;
+    if (!types.includes(matchDragType) && !types.includes('Files')) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = types.includes(matchDragType) ? 'move' : 'copy';
+    heading.classList.add('drop-target');
+  };
+  heading.ondragleave = event => {
+    if (!heading.contains(event.relatedTarget)) heading.classList.remove('drop-target');
+  };
+  heading.ondrop = event => {
+    event.preventDefault();
+    heading.classList.remove('drop-target');
+    const id = event.dataTransfer.getData(matchDragType);
+    const match = savedMatches.find(item => item.id === id);
+    if (match && match.folder !== name) {
+      return changeMatch(async () => {
+        await write([['matches', {...match, folder: name}]]);
+        if (currentMatch?.id === id) currentMatch.folder = name;
+        selectedFolder = name;
+        expanded.add(name);
+        await refreshLibrary();
+        libraryStatus.textContent = 'Video moved to ' + folderLabel(name) + '.';
+      });
+    }
+    const blobs = Array.from(event.dataTransfer.files).filter(blob =>
+      blob.type.startsWith('video/') || /\.(mp4|webm|mov|m4v|ogv|mkv|avi)$/i.test(blob.name)
+    );
+    if (blobs.length) return importVideos(blobs, name);
+    if (event.dataTransfer.files.length) libraryStatus.textContent = 'Drop a video file to import it.';
+  };
+}
 function openSavedMatch(match) {
   const id = match.id;
   return changeMatch(async () => {
@@ -503,6 +583,7 @@ clear.onclick = () => {
 };
 </script>
 </html>
+
 
 
 
