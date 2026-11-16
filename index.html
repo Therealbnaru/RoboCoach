@@ -37,7 +37,7 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 .review-expanded .review-divider{display:none}
 .review-expanded #status{grid-area:3/1/4/-1;margin:0}
 @media(max-width:540px){#videoReview.review-expanded{grid-template-columns:90px minmax(0,1fr);padding:6px;gap:6px}.review-expanded .annotation-tools{padding:5px}.review-expanded .annotation-tools button{padding:6px;font-size:13px}.review-expanded .playback-tools .track{min-width:65px}}
-.volume-control{display:flex;align-items:center;gap:6px;font-size:13px}.volume-control input{width:84px;accent-color:#b9f47e}main.scouting-active #profile{grid-column:1;grid-row:2}canvas.drawing.erasing{cursor:cell}.auto-select{align-self:start;padding:8px;border:1px solid #56565e;border-radius:5px}.auto-select summary{cursor:pointer}.auto-select div{max-height:170px;overflow:auto}.scout-form .auto-select label{display:flex;align-items:center;padding:5px 0}.scout-form .auto-select input{width:auto}.scout-column{min-width:0}.scout-column .scout-actions{margin-top:16px}.scout-column .scout-results{max-height: min(440px,55vh);overflow:auto;border:1px solid #46464b;border-radius:6px}.scout-column .scout-results th{position:sticky;top:0;background:#252526;z-index:1}.scout-column .scout-actions select{max-width:100%}#scoutResultPanel.results-expanded{position:fixed;inset:0;z-index:110;background:#1e1e1e;padding:16px;display:flex;flex-direction:column;overflow:auto}#scoutResultPanel.results-expanded .scout-actions{margin-top:0}#scoutResultPanel.results-expanded .scout-results{flex:1;min-height:0;max-height:none}</style>
+.volume-control{display:flex;align-items:center;gap:6px;font-size:13px}.volume-control input{width:84px;accent-color:#b9f47e}main.scouting-active #profile{grid-column:1;grid-row:2}canvas.drawing.erasing{cursor:cell}.auto-select{align-self:start;padding:8px;border:1px solid #56565e;border-radius:5px}.auto-select summary{cursor:pointer}.auto-select div{max-height:170px;overflow:auto}.scout-form .auto-select label{display:flex;align-items:center;padding:5px 0}.scout-form .auto-select input{width:auto}.scout-column{min-width:0}.scout-column .scout-actions{margin-top:16px}.scout-column .scout-results{max-height: min(440px,55vh);overflow:auto;border:1px solid #46464b;border-radius:6px}.scout-column .scout-results th{position:sticky;top:0;background:#252526;z-index:1}.scout-column .scout-actions select{max-width:100%}#scoutResultPanel.results-expanded{position:fixed;inset:0;z-index:110;background:#1e1e1e;padding:16px;display:flex;flex-direction:column;overflow:auto}#scoutResultPanel.results-expanded .scout-actions{margin-top:0}#scoutResultPanel.results-expanded .scout-results{flex:1;min-height:0;max-height:none}.scout-results-toolbar{margin-top:16px;padding:12px;background:#252526;border:1px solid #46464b;border-radius:8px}.results-expanded .scout-results-toolbar{margin-top:0}.scout-results-heading,.scout-results-actions{display:flex;align-items:center;gap:8px}.scout-results-heading{justify-content:space-between;flex-wrap:wrap}.scout-results-heading h2{margin:0;font-size:15px}.scout-results-actions button,.scout-results-actions summary,.scout-filters select{font:inherit;font-size:13px;color:inherit;background:#303136;border:1px solid #505158;border-radius:5px;padding:6px 9px}.scout-results-actions summary{cursor:pointer}.scout-filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}.scout-filters label{display:grid;gap:4px;min-width:0;font-size:12px}.scout-filters select{width:100%;min-width:0}.results-expanded .scout-filters{max-width:520px}#scoutDataMenu{position:relative}.scout-data-options{position:absolute;top:calc(100% + 5px);right:0;min-width:190px;z-index:4;display:grid;padding:4px;background:#303136;border:1px solid #505158;border-radius:6px;box-shadow:0 6px 18px #0006}.scout-data-options button,.scout-data-options a{padding:7px;text-decoration:none;text-align:left;font-size:13px;color:inherit;background:transparent;border:0}.scout-data-options :is(button,a):hover{background:#43454d}</style>
 <main>
 <header><nav class="tools" aria-label="RoboCoach views"><button id="reviewView" aria-pressed="true">Video Review</button><button id="scoutView" aria-pressed="false">Scouting View</button><button id="profileView" aria-pressed="false">Profile</button></nav><label class="open" for="file">Open video</label><input id="file" type="file" accept="video/*" multiple hidden></header>
 <aside class="library" aria-label="Match library">
@@ -85,13 +85,23 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 <details class="auto-select"><summary>Autos to run against them</summary><div id="autosAgainst"></div></details>
 <div class="tools wide"><button type="submit" id="saveScout">Save entry</button><button type="button" id="resetScout" hidden>Cancel edit</button></div>
 </form>
-<section id="scoutResultPanel" aria-label="Scouting results"><div class="tools scout-actions"><button type="button" id="scoutFullscreen" aria-pressed="false">Fullscreen results</button>
-<label>Event <select id="scoutEvent"></select></label>
-<label>Sort teams by <select id="scoutSort"><option value="autonomous">Average autonomous</option><option value="scoring">Average scoring</option><option value="driving">Average game sense / driving</option><option value="compatibility">Average compatibility</option><option value="skillsRank">World Skills rank</option><option value="team">Team number</option></select></label>
-<label class="open" for="importSkills">Import World Skills CSV</label><input id="importSkills" type="file" accept=".csv,text/csv" hidden>
-<a style="color:#83b7e5" href="https://events.vex.com/robot-competitions/vex-robotics-competition/standings/skills" target="_blank" rel="noopener">Get official standings</a>
-<button id="exportScout">Export entries</button>
-<label class="open" for="importScout">Import entries</label><input id="importScout" type="file" accept=".json,application/json" hidden>
+<section id="scoutResultPanel" aria-label="Scouting results"><div class="scout-results-toolbar">
+<div class="scout-results-heading">
+<h2>Scouting results</h2>
+<div class="scout-results-actions">
+<details id="scoutDataMenu"><summary>Data</summary>
+<div class="scout-data-options">
+<button type="button" data-picker="importSkills">Import World Skills CSV</button>
+<a href="https://events.vex.com/robot-competitions/vex-robotics-competition/standings/skills" target="_blank" rel="noopener">Get official standings ↗</a>
+<button type="button" data-picker="importScout">Import scouting entries</button>
+<button type="button" id="exportScout">Export scouting entries</button>
+</div></details>
+<button type="button" id="scoutFullscreen" aria-pressed="false">Fullscreen</button>
+</div></div>
+<div class="scout-filters"><label>Event <select id="scoutEvent"></select></label>
+<label>Sort by <select id="scoutSort"><option value="autonomous">Average autonomous</option><option value="scoring">Average scoring</option><option value="driving">Average game sense / driving</option><option value="compatibility">Average compatibility</option><option value="skillsRank">World Skills rank</option><option value="team">Team number</option></select></label></div>
+<input id="importSkills" type="file" accept=".csv,text/csv" hidden>
+<input id="importScout" type="file" accept=".json,application/json" hidden>
 </div>
 <p id="scoutStatus" class="hint" role="status">Entries are saved in this browser. Use export and import to combine scouts’ entries across devices.</p>
 <div class="scout-results" tabindex="0" role="region" aria-label="Scouting results"><table><thead><tr><th>Team</th><th>Scoring / 10</th><th>Driving / 10</th><th>Autonomous / 10</th><th>Compatibility / 10</th><th>World Skills rank</th><th>World Skills score</th><th>Entries</th></tr></thead><tbody id="scoutRows"></tbody></table></div></section>
@@ -932,7 +942,7 @@ const scoutResultPanel = byId('scoutResultPanel');
 const scoutFullscreen = byId('scoutFullscreen');
 function setResultsExpanded(expanded) {
   scoutResultPanel.classList.toggle('results-expanded', expanded);
-  scoutFullscreen.textContent = expanded ? 'Exit fullscreen' : 'Fullscreen results';
+  scoutFullscreen.textContent = expanded ? 'Exit fullscreen' : 'Fullscreen';
   scoutFullscreen.setAttribute('aria-pressed', String(expanded));
 }
 scoutFullscreen.onclick = async () => {
@@ -956,6 +966,17 @@ document.addEventListener('fullscreenchange', () => {
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape' && !document.fullscreenElement &&
       scoutResultPanel.classList.contains('results-expanded')) setResultsExpanded(false);
+});
+const scoutDataMenu = byId('scoutDataMenu');
+scoutDataMenu.addEventListener('click', event => {
+  const action = event.target.closest('.scout-data-options button, .scout-data-options a');
+  if (!action) return;
+  if (action.dataset.picker) byId(action.dataset.picker).click();
+  scoutDataMenu.open = false;
+  scoutDataMenu.querySelector('summary').focus();
+});
+document.addEventListener('click', event => {
+  if (scoutDataMenu.open && !scoutDataMenu.contains(event.target)) scoutDataMenu.open = false;
 });
 const skillsStorageKey = 'robocoach.worldSkills';
 let skillsRanks = new Map();
