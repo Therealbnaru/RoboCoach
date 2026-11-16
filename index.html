@@ -37,7 +37,7 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 .review-expanded .review-divider{display:none}
 .review-expanded #status{grid-area:3/1/4/-1;margin:0}
 @media(max-width:540px){#videoReview.review-expanded{grid-template-columns:90px minmax(0,1fr);padding:6px;gap:6px}.review-expanded .annotation-tools{padding:5px}.review-expanded .annotation-tools button{padding:6px;font-size:13px}.review-expanded .playback-tools .track{min-width:65px}}
-.volume-control{display:flex;align-items:center;gap:6px;font-size:13px}.volume-control input{width:84px;accent-color:#b9f47e}main.scouting-active #profile{grid-column:1;grid-row:2}canvas.drawing.erasing{cursor:cell}.auto-select{align-self:start;padding:8px;border:1px solid #56565e;border-radius:5px}.auto-select summary{cursor:pointer}.auto-select div{max-height:170px;overflow:auto}.scout-form .auto-select label{display:flex;align-items:center;padding:5px 0}.scout-form .auto-select input{width:auto}</style>
+.volume-control{display:flex;align-items:center;gap:6px;font-size:13px}.volume-control input{width:84px;accent-color:#b9f47e}main.scouting-active #profile{grid-column:1;grid-row:2}canvas.drawing.erasing{cursor:cell}.auto-select{align-self:start;padding:8px;border:1px solid #56565e;border-radius:5px}.auto-select summary{cursor:pointer}.auto-select div{max-height:170px;overflow:auto}.scout-form .auto-select label{display:flex;align-items:center;padding:5px 0}.scout-form .auto-select input{width:auto}.scout-column{min-width:0}.scout-column .scout-actions{margin-top:16px}.scout-column .scout-results{max-height: min(440px,55vh);overflow:auto;border:1px solid #46464b;border-radius:6px}.scout-column .scout-results th{position:sticky;top:0;background:#252526;z-index:1}.scout-column .scout-actions select{max-width:100%}</style>
 <main>
 <header><nav class="tools" aria-label="RoboCoach views"><button id="reviewView" aria-pressed="true">Video Review</button><button id="scoutView" aria-pressed="false">Scouting View</button><button id="profileView" aria-pressed="false">Profile</button></nav><label class="open" for="file">Open video</label><input id="file" type="file" accept="video/*" multiple hidden></header>
 <aside class="library" aria-label="Match library">
@@ -69,7 +69,7 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 </section>
 <section id="scouting" class="review" hidden aria-label="Scouting View">
 <h1>Scouting View</h1>
-<div class="scout-workspace" id="scoutWorkspace"><form id="scoutForm" class="scout-form">
+<div class="scout-workspace" id="scoutWorkspace"><div class="scout-column"><form id="scoutForm" class="scout-form">
 <label>Entry type<select name="kind"><option>Match observation</option><option>Pit interview</option></select></label>
 <label>Team number<input name="team" required maxlength="30"></label>
 <label>Event<select name="event"><option value="">No event</option></select><input id="newScoutEvent" aria-label="New event name" placeholder="New event name" maxlength="100" hidden></label>
@@ -85,6 +85,17 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 <details class="auto-select"><summary>Autos to run against them</summary><div id="autosAgainst"></div></details>
 <div class="tools wide"><button type="submit" id="saveScout">Save entry</button><button type="button" id="resetScout" hidden>Cancel edit</button></div>
 </form>
+<div class="tools scout-actions">
+<label>Event <select id="scoutEvent"></select></label>
+<label>Sort teams by <select id="scoutSort"><option value="autonomous">Average autonomous</option><option value="scoring">Average scoring</option><option value="driving">Average game sense / driving</option><option value="compatibility">Average compatibility</option><option value="skillsRank">World Skills rank</option><option value="team">Team number</option></select></label>
+<label class="open" for="importSkills">Import World Skills CSV</label><input id="importSkills" type="file" accept=".csv,text/csv" hidden>
+<a style="color:#83b7e5" href="https://events.vex.com/robot-competitions/vex-robotics-competition/standings/skills" target="_blank" rel="noopener">Get official standings</a>
+<button id="exportScout">Export entries</button>
+<label class="open" for="importScout">Import entries</label><input id="importScout" type="file" accept=".json,application/json" hidden>
+</div>
+<p id="scoutStatus" class="hint" role="status">Entries are saved in this browser. Use export and import to combine scouts’ entries across devices.</p>
+<div class="scout-results" tabindex="0" role="region" aria-label="Scouting results"><table><thead><tr><th>Team</th><th>Scoring / 10</th><th>Driving / 10</th><th>Autonomous / 10</th><th>Compatibility / 10</th><th>World Skills rank</th><th>World Skills score</th><th>Entries</th></tr></thead><tbody id="scoutRows"></tbody></table></div>
+</div>
 <section class="route-planner" id="scoutPlanner" aria-label="Field path planner">
 <h2>Field path planner</h2>
 <div class="tools"><div class="tools" id="routeTabs" role="group" aria-label="Routes"></div><button type="button" id="addScoutRoute">+ Route</button></div>
@@ -98,17 +109,8 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 <canvas id="scoutField" tabindex="0" width="800" height="800" aria-label="Draw the selected route"></canvas>
 </div></div>
 <div class="tools"><button type="button" id="undoScoutRoute">Undo</button><button type="button" id="clearScoutRoute">Clear route</button><button id="downloadRoute" type="button" hidden>Download attached route</button></div>
-</section></div>
-<div class="tools scout-actions">
-<label>Event <select id="scoutEvent"></select></label>
-<label>Sort teams by <select id="scoutSort"><option value="autonomous">Average autonomous</option><option value="scoring">Average scoring</option><option value="driving">Average game sense / driving</option><option value="compatibility">Average compatibility</option><option value="skillsRank">World Skills rank</option><option value="team">Team number</option></select></label>
-<label class="open" for="importSkills">Import World Skills CSV</label><input id="importSkills" type="file" accept=".csv,text/csv" hidden>
-<a style="color:#83b7e5" href="https://events.vex.com/robot-competitions/vex-robotics-competition/standings/skills" target="_blank" rel="noopener">Get official standings</a>
-<button id="exportScout">Export entries</button>
-<label class="open" for="importScout">Import entries</label><input id="importScout" type="file" accept=".json,application/json" hidden>
+</section>
 </div>
-<p id="scoutStatus" class="hint" role="status">Entries are saved in this browser. Use export and import to combine scouts’ entries across devices.</p>
-<div class="scout-results"><table><thead><tr><th>Team</th><th>Scoring / 10</th><th>Driving / 10</th><th>Autonomous / 10</th><th>Compatibility / 10</th><th>World Skills rank</th><th>World Skills score</th><th>Entries</th></tr></thead><tbody id="scoutRows"></tbody></table></div>
 </section>
 <section class="review" id="profile" hidden aria-labelledby="profileTitle">
 <h1 id="profileTitle">Robot Profile</h1>
