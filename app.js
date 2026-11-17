@@ -813,7 +813,7 @@ function showLiveScore(show) {
   scoreButton.setAttribute('aria-expanded', String(show));
 }
 function resetLiveScore() {
-  scorePanel.querySelectorAll('input').forEach(input => { input.value = '0'; });
+  scoreGoals.querySelectorAll('input[type="number"]').forEach(input => { input.value = '0'; });
   scoreGoals.querySelectorAll('select').forEach(select => { select.value = ''; });
   byId('scoreAuton').value = '';
   byId('toggleTarget').selectedIndex = 0;
