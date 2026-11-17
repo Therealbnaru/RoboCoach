@@ -743,6 +743,23 @@ video.addEventListener('volumechange', () => { volume.value = Math.round(video.v
 
 const liveTabVideo = byId('liveTabVideo');
 const shareLiveTab = byId('shareLiveTab');
+const startLivePreview = byId('startLivePreview') ?? document.createElement('button');
+async function playLivePreview(stream) {
+  try {
+    await liveTabVideo.play();
+    if (liveTabStream !== stream) return;
+    startLivePreview.hidden = true;
+    reviewStatus.textContent = 'Live tab preview';
+  } catch (error) {
+    if (liveTabStream !== stream) return;
+    console.error('Shared preview could not start:', error);
+    startLivePreview.hidden = false;
+    reviewStatus.textContent = 'Tab selected. Click Start preview to retry playback (' + error.name + ').';
+  }
+}
+startLivePreview.onclick = () => {
+  if (liveTabStream) playLivePreview(liveTabStream);
+};
 const reviewStatus = byId('status');
 const reviewHint = reviewStatus.textContent;
 let liveTabStream;
@@ -797,7 +814,9 @@ function showLiveScore(show) {
 }
 function resetLiveScore() {
   scorePanel.querySelectorAll('input').forEach(input => { input.value = '0'; });
-  scorePanel.querySelectorAll('select').forEach(select => { select.value = ''; });
+  scoreGoals.querySelectorAll('select').forEach(select => { select.value = ''; });
+  byId('scoreAuton').value = '';
+  byId('toggleTarget').selectedIndex = 0;
   previousScore = undefined;
   byId('scoreChange').textContent = '';
   refreshLiveScore();
@@ -1197,6 +1216,7 @@ function stopLiveTab(message = reviewHint) {
   const stream = liveTabStream;
   liveTabStream = undefined;
   stream?.getTracks().forEach(track => track.stop());
+  startLivePreview.hidden = true;
   liveTabVideo.srcObject = null;
   liveTabVideo.hidden = true;
   byId('videoReview').classList.remove('live-tab-active');
@@ -1313,7 +1333,7 @@ shareLiveTab.onclick = async () => {
     stopYouTube();
     liveTabStream = stream;
     stream.getVideoTracks()[0].addEventListener('ended', () => {
-      if (liveTabStream === stream) stopLiveTab('Live tab sharing ended.');
+      if (liveTabStream === stream) stopLiveTab('The browser ended tab sharing. Select the source tab again.');
     }, {once: true});
     video.pause();
     setPen(false);
@@ -1331,25 +1351,13 @@ shareLiveTab.onclick = async () => {
     reviewStatus.textContent = 'Connecting to the shared tab…';
     liveTabVideo.muted = stream.getAudioTracks().length === 0;
     const waiting = setTimeout(() => {
-      if (liveTabStream === stream) reviewStatus.textContent = 'Waiting for video. Make sure the selected tab is playing.';
+      if (liveTabStream === stream && liveTabVideo.readyState < 2) {
+        reviewStatus.textContent = 'Sharing is active, but the browser has not delivered a frame. Check that the source tab is playing, then try Start preview.';
+        startLivePreview.hidden = false;
+      }
     }, 5000);
-    try {
-      try {
-        await liveTabVideo.play();
-      } catch (error) {
-        if (liveTabStream !== stream) return;
-        if (error.name !== 'NotAllowedError' || liveTabVideo.muted) throw error;
-        liveTabVideo.muted = true;
-        await liveTabVideo.play();
-      }
-      if (liveTabStream === stream) {
-        reviewStatus.textContent = liveTabVideo.muted && stream.getAudioTracks().length
-          ? 'Live tab preview · Audio muted by the browser. Move the volume slider to unmute.'
-          : 'Live tab preview · Video is processed in this browser.';
-      }
-    } finally {
-      clearTimeout(waiting);
-    }
+    await playLivePreview(stream);
+    clearTimeout(waiting);
   } catch (error) {
     if (request === liveRequest) {
       console.error('Live tab sharing failed:', error);
