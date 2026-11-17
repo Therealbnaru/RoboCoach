@@ -735,6 +735,7 @@ try {
 volume.value = Math.round(video.volume * 100);
 volume.oninput = () => {
   liveTabVideo.volume = Number(volume.value) / 100;
+  if (liveTabStream?.getAudioTracks().length) liveTabVideo.muted = false;
   video.volume = Number(volume.value) / 100;
   try { localStorage.setItem('robocoach.volume', volume.value); } catch {}
 };
@@ -1326,11 +1327,35 @@ shareLiveTab.onclick = async () => {
     liveSourceLink.hidden = false;
     byId('videoReview').classList.add('live-tab-active');
     shareLiveTab.textContent = 'Stop sharing';
-    reviewStatus.textContent = 'Live tab preview · Video is processed in this browser.';
-    await liveTabVideo.play();
+    shareLiveTab.disabled = false;
+    reviewStatus.textContent = 'Connecting to the shared tab…';
+    liveTabVideo.muted = stream.getAudioTracks().length === 0;
+    const waiting = setTimeout(() => {
+      if (liveTabStream === stream) reviewStatus.textContent = 'Waiting for video. Make sure the selected tab is playing.';
+    }, 5000);
+    try {
+      try {
+        await liveTabVideo.play();
+      } catch (error) {
+        if (liveTabStream !== stream) return;
+        if (error.name !== 'NotAllowedError' || liveTabVideo.muted) throw error;
+        liveTabVideo.muted = true;
+        await liveTabVideo.play();
+      }
+      if (liveTabStream === stream) {
+        reviewStatus.textContent = liveTabVideo.muted && stream.getAudioTracks().length
+          ? 'Live tab preview · Audio muted by the browser. Move the volume slider to unmute.'
+          : 'Live tab preview · Video is processed in this browser.';
+      }
+    } finally {
+      clearTimeout(waiting);
+    }
   } catch (error) {
     if (request === liveRequest) {
-      stopLiveTab(error.name === 'NotAllowedError' ? 'Tab sharing was canceled or blocked.' : 'Could not start the live feed.');
+      console.error('Live tab sharing failed:', error);
+      const message = liveTabStream ? 'Could not play the shared feed' :
+        error.name === 'NotAllowedError' ? 'Tab sharing was canceled or blocked' : 'Could not start tab sharing';
+      stopLiveTab(message + (error.name ? ' (' + error.name + ').' : '.'));
     }
   } finally {
     if (request === liveRequest) shareLiveTab.disabled = false;
