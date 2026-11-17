@@ -57,7 +57,7 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 #scorePanel #clearToggles{background:transparent}
 #toggleTrackingStatus{margin:8px 0 0;font-size:12px}
 .score-auton{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.toggle-model{margin-top:10px;font-size:13px}.toggle-model summary{cursor:pointer}.toggle-model input{width:100%;margin:6px 0}</style>
+.toggle-model{margin-top:10px;font-size:13px}.toggle-model summary{cursor:pointer}.toggle-model input{width:100%;margin:6px 0}#toggleDebugOverlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1}.live-frozen #toggleDebugOverlay{display:none}.toggle-dev{display:flex;gap:6px;align-items:center;margin-top:8px;font-size:13px}#scorePanel .toggle-dev input{width:auto}</style>
 <main>
 <header><nav class="tools" aria-label="RoboCoach views"><button id="reviewView" aria-pressed="true">Video Review</button><button id="scoutView" aria-pressed="false">Scouting View</button><button id="profileView" aria-pressed="false">Profile</button></nav><label class="open" for="file">Open video</label><input id="file" type="file" accept="video/*" multiple hidden></header>
 <aside class="library" aria-label="Match library">
@@ -70,7 +70,7 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 <p class="hint" id="libraryStatus" role="status">Videos and reviews are stored in this browser.</p>
 </aside>
 <section class="review" id="videoReview" aria-label="Video review">
-<div class="stage"><video id="video" playsinline preload="metadata"></video><video id="liveTabVideo" playsinline autoplay hidden aria-label="Live tab feed"></video><canvas id="frozenLiveFrame" aria-label="Frozen live frame" hidden></canvas><iframe id="youtubeVideo" title="YouTube match player" referrerpolicy="strict-origin-when-cross-origin" allow="encrypted-media; picture-in-picture; fullscreen" allowfullscreen hidden></iframe><canvas id="ink" aria-label="Freehand drawing overlay"></canvas><div id="empty" class="empty">Open a match video to start.</div></div>
+<div class="stage"><video id="video" playsinline preload="metadata"></video><video id="liveTabVideo" playsinline autoplay hidden aria-label="Live tab feed"></video><canvas id="toggleDebugOverlay" aria-hidden="true" hidden></canvas><canvas id="frozenLiveFrame" aria-label="Frozen live frame" hidden></canvas><iframe id="youtubeVideo" title="YouTube match player" referrerpolicy="strict-origin-when-cross-origin" allow="encrypted-media; picture-in-picture; fullscreen" allowfullscreen hidden></iframe><canvas id="ink" aria-label="Freehand drawing overlay"></canvas><div id="empty" class="empty">Open a match video to start.</div></div>
 <div class="tools playback-tools">
 <button id="play" disabled>Play</button><div class="track"><input class="seek" id="seek" aria-label="Video position" type="range" min="0" max="0" step="any" value="0" disabled><div id="timeline" class="timeline" aria-label="Annotation markers"></div></div><output id="time">0:00 / 0:00</output><label class="volume-control">Volume <input id="reviewVolume" type="range" min="0" max="100" value="100"></label><button id="openYouTube" type="button">Open YouTube</button><button id="pauseYouTube" type="button" hidden disabled>Pause YouTube</button><button id="closeYouTube" type="button" hidden>Close YouTube</button><input id="liveSourceLink" type="url" aria-label="Source video link" placeholder="Source video link (optional)" hidden><button id="liveScoreButton" type="button" hidden aria-expanded="false">Live score</button><button id="drawLiveTab" type="button" hidden aria-pressed="false">Draw live</button><button id="saveLiveAnnotation" type="button" hidden>Save annotation</button><button id="freezeLiveTab" type="button" hidden>Freeze &amp; Annotate</button><button id="shareLiveTab" type="button">Share live tab</button><button id="fullscreenReview" type="button" aria-pressed="false">Fullscreen</button>
 </div>
@@ -90,7 +90,7 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 <button type="button" id="pickToggle">Pick on video</button>
 <button type="button" id="clearToggles" disabled>Stop tracking</button>
 </div>
-<details class="toggle-model"><summary>YOLO Toggle model</summary><p class="hint">Load a trained single-class Toggle model. Use Pick on video once per side to identify its position.</p><label>ONNX model <input id="toggleModelFile" type="file" accept=".onnx"></label><button type="button" id="unloadToggleModel" disabled>Use color sampling</button><p class="hint" id="toggleModelStatus" role="status">Color sampling active</p></details><p class="hint" id="toggleTrackingStatus" role="status"></p>
+<label class="toggle-dev"><input id="toggleDevMode" type="checkbox"> Dev mode</label><details class="toggle-model" id="toggleModelControls" hidden><summary>YOLO Toggle model</summary><p class="hint">Load a trained single-class Toggle model. Use Pick on video once per side to identify its position.</p><label>ONNX model <input id="toggleModelFile" type="file" accept=".onnx"></label><button type="button" id="unloadToggleModel" disabled>Use color sampling</button><p class="hint" id="toggleModelStatus" role="status">Color sampling active</p></details><p class="hint" id="toggleTrackingStatus" role="status"></p>
 </div>
 <label class="score-auton">Autonomous bonus <select id="scoreAuton"><option value="">Pending / none</option><option value="red">Red +12</option><option value="blue">Blue +12</option><option value="tie">Tie +6 each</option></select></label>
 <p class="hint" id="scoreChange"></p></section>
@@ -996,6 +996,8 @@ let pickToggleIndex;
 function stopToggleTracking() {
   trackingGeneration++;
   trackedToggles.clear();
+  debugDetections = [];
+  drawToggleDebug();
   byId('clearToggles').disabled = true;
   pickToggleIndex = undefined;
   liveTabVideo.classList.remove('pick-toggle');
@@ -1043,6 +1045,46 @@ function sampleToggleColor(x, y, source = liveTabVideo) {
 }
 let toggleModel;
 let modelBusy = false;
+const debugOverlay = byId('toggleDebugOverlay');
+const toggleDevMode = byId('toggleDevMode');
+let debugDetections = [];
+toggleDevMode.onchange = () => {
+  const enabled = toggleDevMode.checked;
+  debugOverlay.hidden = !enabled;
+  byId('toggleModelControls').hidden = !enabled;
+  drawToggleDebug();
+};
+function drawToggleDebug() {
+  if (debugOverlay.hidden) return;
+  const width = liveTabVideo.clientWidth, height = liveTabVideo.clientHeight;
+  if (!width || !height || !liveTabVideo.videoWidth || !liveTabVideo.videoHeight) return;
+  const ratio = window.devicePixelRatio || 1;
+  debugOverlay.width = Math.round(width * ratio);
+  debugOverlay.height = Math.round(height * ratio);
+  const context = debugOverlay.getContext('2d');
+  context.scale(ratio, ratio);
+  const scale = Math.min(width / liveTabVideo.videoWidth, height / liveTabVideo.videoHeight);
+  const contentWidth = liveTabVideo.videoWidth * scale, contentHeight = liveTabVideo.videoHeight * scale;
+  const offsetX = (width - contentWidth) / 2, offsetY = (height - contentHeight) / 2;
+  context.font = '12px system-ui';
+  context.lineWidth = 2;
+  for (const detection of debugDetections) {
+    const boxWidth = detection.width * contentWidth;
+    const boxHeight = detection.height * contentHeight;
+    const x = offsetX + detection.x * contentWidth - boxWidth / 2;
+    const y = offsetY + detection.y * contentHeight - boxHeight / 2;
+    const side = ['Left', 'Right', 'Top', 'Bottom'][detection.side] ?? 'Toggle';
+    const label = side + ' · ' + Math.round(detection.confidence * 100) + '% · ' + (detection.color ?? 'unclear');
+    context.strokeStyle = '#b9f47e';
+    context.strokeRect(x, y, boxWidth, boxHeight);
+    const labelY = Math.max(0, y - 18);
+    context.fillStyle = '#14191e';
+    context.fillRect(x, labelY, context.measureText(label).width + 8, 18);
+    context.fillStyle = '#fff';
+    context.fillText(label, x + 4, labelY + 13);
+  }
+}
+new ResizeObserver(drawToggleDebug).observe(liveTabVideo);
 let trackingGeneration = 0;
 const modelFile = byId('toggleModelFile');
 const modelStatus = byId('toggleModelStatus');
@@ -1098,6 +1140,8 @@ unloadModel.onclick = () => {
   trackingGeneration++;
   unloadModel.disabled = true;
   modelStatus.textContent = 'Color sampling active';
+  debugDetections = [];
+  drawToggleDebug();
   previous?.session.release().catch(console.error);
 };
 async function runToggleModel({runtime, session}, pixels) {
@@ -1144,7 +1188,7 @@ async function detectTogglePoints(model, anchors) {
       if (distance < closest) { side = index; closest = distance; }
     }
     if (side !== undefined && confidence > (found.get(side)?.confidence ?? 0))
-      found.set(side, {x, y, confidence});
+      found.set(side, {x, y, confidence, side, width: data[2 * count + i] / (width * scale), height: data[3 * count + i] / (height * scale)});
   }
   return found;
 }
@@ -1157,12 +1201,15 @@ setInterval(async () => {
     const model = toggleModel;
     const points = model ? await detectTogglePoints(model, trackedToggles) : trackedToggles;
     if (generation !== trackingGeneration || scorePanel.hidden || liveTabVideo.hidden) return;
+    debugDetections = model ? [...points.values()] : [];
     for (const index of trackedToggles.keys()) {
       const point = points.get(index);
       const color = point && sampleToggleColor(point.x, point.y, model ? modelFrame : liveTabVideo);
+      if (model && point) point.color = color;
       if (!color) { uncertain++; continue; }
       scoreGoals.children[index].querySelector('select').value = color === 'neutral' ? '' : color;
     }
+    drawToggleDebug();
     refreshLiveScore();
     trackingStatus.textContent = uncertain
       ? uncertain + ' Toggle(s) unclear · Previous color kept. Correct it manually if needed.'
