@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>RoboCoach Video Review</title>
-<link rel="stylesheet" href="./styles.css?v=toggle-preview-1">
+<link rel="stylesheet" href="./styles.css?v=toggle-face-1">
 <main>
 <header><nav class="tools" aria-label="RoboCoach views"><button id="reviewView" aria-pressed="true">Video Review</button><button id="scoutView" aria-pressed="false">Scouting View</button><button id="profileView" aria-pressed="false">Profile</button></nav><label class="open" for="file">Open video</label><input id="file" type="file" accept="video/*" multiple hidden></header>
 <aside class="library" aria-label="Match library">
@@ -37,7 +37,7 @@
 <button type="button" id="pickToggle">Pick on video</button>
 <button type="button" id="clearToggles" disabled>Stop tracking</button>
 </div>
-<label class="toggle-dev"><input id="toggleDevMode" type="checkbox"> Dev mode</label><details class="toggle-model" id="toggleModelControls" hidden><summary>YOLO Toggle model</summary><p class="hint">Load a trained single-class Toggle model: YOLO26 OBB [1, 6, N] or YOLO detection [1, 5, N], exported at 640×640 with NMS off. Dev mode shows detections automatically, about once per second. Use Pick on video once per side to assign detected Toggles for scoring.</p><label>ONNX model <input id="toggleModelFile" type="file" accept=".onnx"></label><button type="button" id="unloadToggleModel" disabled>Use color sampling</button><p class="hint" id="toggleModelStatus" role="status">Color sampling active</p></details><p class="hint" id="toggleTrackingStatus" role="status"></p>
+<label class="toggle-dev"><input id="toggleDevMode" type="checkbox"> Dev mode</label><details class="toggle-model" id="toggleModelControls" hidden><summary>YOLO Toggle model</summary><p class="hint">Load a trained single-class Toggle model: YOLO26 OBB [1, 6, N] or YOLO detection [1, 5, N], exported at 640×640 with NMS off. Dev mode shows detections automatically, about once per second. For each side, use Pick on video and click the strip facing into the field. The white dot marks the color sample. Color buttons and totals update after two matching readings. Re-pick if the camera changes angle.</p><label>ONNX model <input id="toggleModelFile" type="file" accept=".onnx"></label><button type="button" id="unloadToggleModel" disabled>Use color sampling</button><p class="hint" id="toggleModelStatus" role="status">Color sampling active</p></details><p class="hint" id="toggleTrackingStatus" role="status"></p>
 </div>
 <div class="score-auton"><span>Autonomous bonus</span><select id="scoreAuton" hidden aria-label="Autonomous bonus"><option value="">Pending / none</option><option value="red">Red +12</option><option value="blue">Blue +12</option><option value="tie">Tie +6 each</option></select><div id="scoreAutonChoices" class="score-segments" role="group" aria-label="Autonomous bonus"></div></div>
 <p class="hint" id="scoreChange"></p></section>
@@ -128,7 +128,7 @@
 <div class="tools wide"><button type="submit">Save profile</button><span class="hint" id="profileStatus" role="status">Saved in this browser.</span></div>
 </form></div>
 </section></main>
-<script src="./app.js?v=toggle-preview-1"></script>
+<script src="./app.js?v=toggle-face-1"></script>
 </html>
 
 
