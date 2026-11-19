@@ -910,7 +910,7 @@ function showLiveScore(show) {
   byId('videoReview').classList.toggle('scoring-active', show);
   scoreButton.textContent = show ? 'Hide live score' : 'Live score';
   scoreButton.setAttribute('aria-expanded', String(show));
-  if (show) refreshLiveScore();
+  if (show) { refreshLiveScore(); checkToggleFrame(); }
 }
 function resetLiveScore() {
   scoreGoals.querySelectorAll('input[type="number"]').forEach(input => { input.value = '0'; });
@@ -1001,6 +1001,7 @@ toggleDevMode.onchange = () => {
   debugOverlay.hidden = !enabled;
   byId('toggleModelControls').hidden = !enabled;
   drawToggleDebug();
+  if (enabled) checkToggleFrame();
 };
 function drawToggleDebug() {
   if (debugOverlay.hidden) return;
@@ -1081,6 +1082,7 @@ modelFile.onchange = async () => {
     trackingGeneration++;
     previous?.session.release().catch(console.error);
     modelStatus.textContent = file.name + ' loaded · ' + (probe.dims[1] === 6 ? 'Rotated boxes (OBB)' : 'Detection boxes');
+    checkToggleFrame();
   } catch (error) {
     console.error(error);
     modelStatus.textContent = 'Could not load model: ' + String(error.message || error).slice(0, 220) + ' Supported: 640×640 single-class raw ONNX detection or OBB exports, NMS off.';
@@ -1137,9 +1139,10 @@ function decodeTogglePoints(data, dims, anchors, {width, height, scale, dx, dy})
   const count = dims[2];
   const rotated = dims[1] === 6;
   const found = new Map();
+  const candidates = [];
   for (let i = 0; i < count; i++) {
     const confidence = data[4 * count + i];
-    if (!Number.isFinite(confidence) || confidence < .5) continue;
+    if (!Number.isFinite(confidence) || confidence < .25) continue;
     const x = (data[i] - dx) / (width * scale);
     const y = (data[count + i] - dy) / (height * scale);
     const boxWidth = data[2 * count + i] / (width * scale);
@@ -1147,46 +1150,113 @@ function decodeTogglePoints(data, dims, anchors, {width, height, scale, dx, dy})
     const angle = rotated ? data[5 * count + i] : 0;
     if (![x, y, boxWidth, boxHeight, angle].every(Number.isFinite) ||
         x < 0 || x > 1 || y < 0 || y > 1 || boxWidth <= 0 || boxHeight <= 0) continue;
+    candidates.push({x, y, confidence, width: boxWidth, height: boxHeight, angle});
+  }
+  const detections = suppressToggleDuplicates(candidates, width, height);
+  found.detections = detections;
+  for (const detection of detections) {
+    const {x, y, confidence} = detection;
+    if (confidence < .5) continue;
     let side, closest = .10;
     for (const [index, anchor] of anchors) {
       const distance = Math.hypot(x - anchor.x, y - anchor.y);
       if (distance < closest) { side = index; closest = distance; }
     }
     if (side !== undefined && confidence > (found.get(side)?.confidence ?? 0))
-      found.set(side, {x, y, confidence, side, width: boxWidth, height: boxHeight, angle});
+      found.set(side, {...detection, side});
+    if (side !== undefined) detection.side = side;
   }
   return found;
 }
 
-setInterval(async () => {
+// Rotated polygon overlap avoids drawing the raw model's duplicate candidates.
+function suppressToggleDuplicates(candidates, width, height) {
+  const cross = (a, b, p) => (b[0]-a[0])*(p[1]-a[1])-(b[1]-a[1])*(p[0]-a[0]);
+  const polygon = d => {
+    const c = Math.cos(d.angle), s = Math.sin(d.angle);
+    return [[-1,-1],[1,-1],[1,1],[-1,1]].map(([x,y]) => {
+      const dx = x*d.width*width/2, dy = y*d.height*height/2;
+      return [d.x*width+c*dx-s*dy, d.y*height+s*dx+c*dy];
+    });
+  };
+  const area = p => Math.abs(p.reduce((sum,a,i) => {
+    const b = p[(i+1)%p.length]; return sum+a[0]*b[1]-b[0]*a[1];
+  },0))/2;
+  const overlap = (subject, clip) => {
+    let result = subject;
+    for (let i=0;i<clip.length && result.length;i++) {
+      const a=clip[i], b=clip[(i+1)%clip.length], input=result;
+      result=[];
+      for (let j=0;j<input.length;j++) {
+        const p=input[j], q=input[(j+1)%input.length];
+        const dp=cross(a,b,p), dq=cross(a,b,q);
+        if (dp>=0) result.push(p);
+        if ((dp>=0)!==(dq>=0)) {
+          const t=dp/(dp-dq);
+          result.push([p[0]+t*(q[0]-p[0]),p[1]+t*(q[1]-p[1])]);
+        }
+      }
+    }
+    return area(result);
+  };
+  const kept=[];
+  for (const d of candidates.sort((a,b)=>b.confidence-a.confidence).slice(0,200)) {
+    const p=polygon(d), size=area(p);
+    if (kept.some(k => { const intersection=overlap(p,k.p); return intersection/(size+k.size-intersection)>.45; })) continue;
+    kept.push({d,p,size});
+    if (kept.length===40) break;
+  }
+  return kept.map(k=>k.d);
+}
+let lastToggleScoreCheck = -Infinity;
+async function checkToggleFrame() {
   const source = scoringVideo();
-  if (modelBusy || !trackedToggles.size || scorePanel.hidden || !source || source.readyState < 2 || source.seeking) return;
+  const preview = toggleDevMode.checked && !!toggleModel;
+  if (modelBusy || (!trackedToggles.size && !preview) || scorePanel.hidden ||
+      !source || source.readyState < 2 || source.seeking || document.hidden) return;
+  const updateScore = performance.now() - lastToggleScoreCheck >= 7000;
+  if (!preview && !updateScore) return;
   modelBusy = true;
   const generation = trackingGeneration;
+  const model = toggleModel;
   let uncertain = 0;
   try {
-    const model = toggleModel;
     const points = model ? await detectTogglePoints(model, trackedToggles, source) : trackedToggles;
-    if (generation !== trackingGeneration || scorePanel.hidden || source !== scoringVideo()) return;
-    debugDetections = model ? [...points.values()] : [];
-    for (const index of trackedToggles.keys()) {
-      const point = points.get(index);
-      const color = point && sampleToggleColor(point.x, point.y, model ? modelFrame : source);
-      if (model && point) point.color = color;
-      if (!color) { uncertain++; continue; }
-      scoreGoals.children[index].querySelector('select').value = color === 'neutral' ? '' : color;
+    if (generation !== trackingGeneration || scorePanel.hidden || source !== scoringVideo() || model !== toggleModel) return;
+    debugDetections = model ? points.detections : [];
+    for (const detection of debugDetections)
+      detection.color = sampleToggleColor(detection.x, detection.y, modelFrame);
+    if (updateScore && trackedToggles.size) {
+      lastToggleScoreCheck = performance.now();
+      for (const index of trackedToggles.keys()) {
+        const point = points.get(index);
+        const color = point && sampleToggleColor(point.x, point.y, model ? modelFrame : source);
+        if (!color) { uncertain++; continue; }
+        scoreGoals.children[index].querySelector('select').value = color === 'neutral' ? '' : color;
+      }
+      refreshLiveScore();
     }
     drawToggleDebug();
-    refreshLiveScore();
-    trackingStatus.textContent = uncertain
-      ? uncertain + ' Toggle(s) unclear · Previous color kept. Correct it manually if needed.'
-      : trackedToggles.size + ' tracked · Checks every 7 seconds';
-  } catch {
-    if (generation === trackingGeneration) trackingStatus.textContent = 'Could not check Toggles. You can still score manually.';
+    const previewStatus = preview
+      ? debugDetections.length + ' Toggle detection(s) · Preview updates about every second. '
+      : '';
+    trackingStatus.textContent = previewStatus + (trackedToggles.size
+      ? trackedToggles.size + ' assigned · Score checks every 7 seconds.' + (uncertain ? ' Unclear colors kept unchanged.' : '')
+      : 'Pick on video to assign Left / Right / Top / Bottom. Preview alone does not change scores.');
+  } catch (error) {
+    if (generation === trackingGeneration) {
+      debugDetections = [];
+      drawToggleDebug();
+      trackingStatus.textContent = 'Detection check failed: ' + String(error.message || error).slice(0,180);
+    }
   } finally {
     modelBusy = false;
   }
-}, 7000);
+}
+setInterval(checkToggleFrame, 1000);
+for (const source of [video, liveTabVideo])
+  for (const event of ['loadeddata', 'seeked', 'pause', 'play'])
+    source.addEventListener(event, checkToggleFrame);
 const drawLiveTab = byId('drawLiveTab');
 reviewResize.observe(liveTabVideo);
 liveTabVideo.addEventListener('resize', layout);
