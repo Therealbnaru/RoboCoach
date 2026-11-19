@@ -36,9 +36,9 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 #scoreGoals label{text-transform:none;font-size:13px}
 #scorePanel>label{font-size:13px}
 @media(min-width:1050px){
-  #videoReview.live-tab-active:not(.review-expanded):has(#scorePanel:not([hidden])){display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,390px);column-gap:14px;align-items:start}
-  #videoReview.live-tab-active:not(.review-expanded):has(#scorePanel:not([hidden]))>:is(.stage,.playback-tools,.annotation-tools,.review-divider,#status){grid-column:1}
-  #videoReview.live-tab-active:not(.review-expanded) #scorePanel{grid-column:2;grid-row:1/6;margin-top:0;max-height:74vh;overflow:auto}
+  #videoReview.scoring-active:not(.review-expanded){display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,390px);column-gap:14px;align-items:start}
+  #videoReview.scoring-active:not(.review-expanded)>:is(.stage,.playback-tools,.annotation-tools,.review-divider,#status){grid-column:1}
+  #videoReview.scoring-active:not(.review-expanded) #scorePanel{grid-column:2;grid-row:1/6;margin-top:0;max-height:74vh;overflow:auto}
   #scoreGoals{grid-template-columns:repeat(2,minmax(0,1fr))}
   #scoreGoals fieldset:last-child{grid-column:1/-1}
 }
@@ -101,10 +101,12 @@ header{grid-column:2;grid-row:1;margin:0;padding:12px 22px;border-bottom:1px sol
 #scorePanel .toggle-tracker{background:#161b21;border-color:#353e4a;border-radius:9px;padding:11px;margin:14px 0}
 .review-expanded #scorePanel{max-height:42vh}
 @media(min-width:1050px){
- #videoReview.live-tab-active:not(.review-expanded):has(#scorePanel:not([hidden])){grid-template-columns:minmax(0,1fr) minmax(390px,460px)}
+ #videoReview.scoring-active:not(.review-expanded){grid-template-columns:minmax(0,1fr) minmax(390px,460px)}
 }
 @media(min-width:681px) and (max-width:1049px){
  #scoreGoals{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media(min-width:1500px){.review-expanded #scoreGoals{grid-template-columns:repeat(4,minmax(0,1fr))}.review-expanded #scoreGoals .score-midfield{grid-column:1/-1}.review-expanded .score-midfield .score-counters{grid-template-columns:repeat(5,minmax(0,1fr))}.review-expanded .score-midfield .score-counter:first-child{grid-column:auto}}
 @media(max-width:540px){#scorePanel{padding:12px}#scoreGoals{grid-template-columns:minmax(0,1fr)}.score-midfield .score-counters{grid-template-columns:minmax(0,1fr)}.score-counter{grid-template-columns:44px minmax(44px,1fr) 44px}#scorePanel .score-step{width:44px;height:44px}#scoreGoals .score-counter input{height:44px}#scoreGoals .score-counter label{font-size:12px}#scorePanel .score-choice{min-height:40px}}
+
+#video.pick-toggle,#liveTabVideo.pick-toggle{cursor:crosshair}
