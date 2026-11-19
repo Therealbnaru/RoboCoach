@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>RoboCoach Video Review</title>
-<link rel="stylesheet" href="./styles.css">
+<link rel="stylesheet" href="./styles.css?v=score-controls-1">
 <main>
 <header><nav class="tools" aria-label="RoboCoach views"><button id="reviewView" aria-pressed="true">Video Review</button><button id="scoutView" aria-pressed="false">Scouting View</button><button id="profileView" aria-pressed="false">Profile</button></nav><label class="open" for="file">Open video</label><input id="file" type="file" accept="video/*" multiple hidden></header>
 <aside class="library" aria-label="Match library">
@@ -26,8 +26,9 @@
 </div>
 <p class="hint" id="status" role="status">Turn on the pen to pause and draw. Click a timeline dot to revisit a drawing or note. Drawings and notes save automatically to your match library.</p>
 <section id="scorePanel" hidden aria-label="Projected Override score">
-<strong><output id="scoreTotal" aria-live="polite"></output></strong>
-<p class="hint">Projected if the match ended here. Enter visible scoring Pin halves and settled Toggle colors.</p>
+<div class="score-heading"><div><span class="score-eyebrow">MATCH CALCULATOR</span><h2>Live score</h2></div><button type="button" id="resetScore" class="score-reset" aria-label="Reset all scoring counts and bonuses">Reset</button></div>
+<output id="scoreTotal" class="scoreboard" aria-live="polite" aria-atomic="true"><span class="alliance-total red"><span>Red alliance</span><strong id="redScore">0</strong></span><span class="score-versus" aria-hidden="true">VS</span><span class="alliance-total blue"><span>Blue alliance</span><strong id="blueScore">0</strong></span></output>
+<p class="score-instruction">Tap + or − to count scoring Pin halves. Select the settled color of each Toggle.</p>
 <div id="scoreGoals"></div>
 <div class="toggle-tracker">
 <label for="toggleTarget">Track a Toggle</label>
@@ -38,7 +39,7 @@
 </div>
 <label class="toggle-dev"><input id="toggleDevMode" type="checkbox"> Dev mode</label><details class="toggle-model" id="toggleModelControls" hidden><summary>YOLO Toggle model</summary><p class="hint">Load a trained single-class Toggle model. Use Pick on video once per side to identify its position.</p><label>ONNX model <input id="toggleModelFile" type="file" accept=".onnx"></label><button type="button" id="unloadToggleModel" disabled>Use color sampling</button><p class="hint" id="toggleModelStatus" role="status">Color sampling active</p></details><p class="hint" id="toggleTrackingStatus" role="status"></p>
 </div>
-<label class="score-auton">Autonomous bonus <select id="scoreAuton"><option value="">Pending / none</option><option value="red">Red +12</option><option value="blue">Blue +12</option><option value="tie">Tie +6 each</option></select></label>
+<div class="score-auton"><span>Autonomous bonus</span><select id="scoreAuton" hidden aria-label="Autonomous bonus"><option value="">Pending / none</option><option value="red">Red +12</option><option value="blue">Blue +12</option><option value="tie">Tie +6 each</option></select><div id="scoreAutonChoices" class="score-segments" role="group" aria-label="Autonomous bonus"></div></div>
 <p class="hint" id="scoreChange"></p></section>
 <dialog id="nameLiveAnnotation">
 <form id="saveLiveForm">
@@ -127,7 +128,7 @@
 <div class="tools wide"><button type="submit">Save profile</button><span class="hint" id="profileStatus" role="status">Saved in this browser.</span></div>
 </form></div>
 </section></main>
-<script src="./app.js?v=live-score-reset-3"></script>
+<script src="./app.js?v=score-controls-1"></script>
 </html>
 
 
