@@ -769,17 +769,100 @@ const scorePanel = byId('scorePanel');
 const scoreButton = byId('liveScoreButton');
 const scoreGoals = byId('scoreGoals');
 let previousScore;
+function makeScoreChoices(select, container, choices) {
+  for (const [value, text, color] of choices) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'score-choice ' + color;
+    button.textContent = text;
+    button.dataset.value = value;
+    button.setAttribute('aria-pressed', String(select.value === value));
+    button.onclick = () => {
+      select.value = value;
+      refreshLiveScore();
+    };
+    container.append(button);
+  }
+}
 for (const title of ['Left Toggle', 'Right Toggle', 'Top Toggle', 'Bottom Toggle', 'Midfield']) {
   const midfield = title === 'Midfield';
   const area = document.createElement('fieldset');
-  area.innerHTML = '<legend>' + title + '</legend>';
-  for (const label of ['Red halves', 'Blue halves', 'Yellow halves', ...(midfield ? ['Red robots', 'Blue robots'] : [])]) {
-    area.insertAdjacentHTML('beforeend', '<label>' + label +
-      ' <input type="number" min="0" step="1" value="0"' + (label.endsWith('robots') ? ' max="2"' : '') + '></label>');
+  area.className = 'score-area' + (midfield ? ' score-midfield' : '');
+  const legend = document.createElement('legend');
+  legend.textContent = title;
+  area.append(legend);
+  const rows = document.createElement('div');
+  rows.className = 'score-counters';
+  for (const [label, color, shape] of [
+    ['Yellow halves', 'yellow', '◆'], ['Red halves', 'red', '●'], ['Blue halves', 'blue', '■'],
+    ...(midfield ? [['Red robots', 'red', '▰'], ['Blue robots', 'blue', '▰']] : [])
+  ]) {
+    const row = document.createElement('div');
+    row.className = 'score-counter ' + color;
+    const name = document.createElement('label');
+    const input = document.createElement('input');
+    input.id = 'score-' + scoreGoals.childElementCount + '-' + color + (label.endsWith('robots') ? '-robots' : '');
+    input.type = 'number';
+    input.min = '0';
+    input.step = '1';
+    input.value = '0';
+    input.inputMode = 'numeric';
+    input.setAttribute('aria-label', title + ': ' + label);
+    if (label.endsWith('robots')) input.max = '2';
+    // Keep the scoring engine's original red, blue, yellow input order.
+    input.dataset.scoreOrder = label === 'Red halves' ? 0 : label === 'Blue halves' ? 1 : label === 'Yellow halves' ? 2 : label === 'Red robots' ? 3 : 4;
+    name.htmlFor = input.id;
+    const icon = document.createElement('span');
+    icon.className = 'score-pin';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = shape;
+    name.append(icon, ' ', label);
+    row.append(name);
+    for (const [delta, text] of [[-1, '−'], [1, '+']]) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'score-step';
+      button.textContent = text;
+      button.dataset.delta = delta;
+      button.setAttribute('aria-label', (delta > 0 ? 'Add one ' : 'Remove one ') + label.toLowerCase() + ' in ' + title);
+      button.onclick = () => {
+        const current = Number(input.value) || 0;
+        input.value = String(Math.max(0, Math.min(input.max ? Number(input.max) : Infinity, current + delta)));
+        refreshLiveScore();
+      };
+      row.append(button);
+      if (delta === -1) row.append(input);
+    }
+    input.onchange = () => {
+      input.value = String(Math.max(0, Math.min(input.max ? Number(input.max) : Infinity, Math.round(Number(input.value) || 0))));
+      refreshLiveScore();
+    };
+    rows.append(row);
   }
-  if (!midfield) area.insertAdjacentHTML('beforeend', '<label>Toggle <select><option value="">Neutral</option><option value="red">Red</option><option value="blue">Blue</option></select></label>');
+  area.append(rows);
+  if (!midfield) {
+    const label = document.createElement('span');
+    label.className = 'score-owner-label';
+    label.textContent = 'Toggle color';
+    const select = document.createElement('select');
+    select.hidden = true;
+    select.setAttribute('aria-label', title + ' color');
+    for (const [value, text] of [['', 'Neutral'], ['red', 'Red'], ['blue', 'Blue']]) select.add(new Option(text, value));
+    const choices = document.createElement('div');
+    choices.className = 'score-segments';
+    choices.setAttribute('role', 'group');
+    choices.setAttribute('aria-label', title + ' color');
+    makeScoreChoices(select, choices, [['red', 'Red', 'red'], ['', 'Neutral', 'neutral'], ['blue', 'Blue', 'blue']]);
+    area.append(label, select, choices);
+  }
   scoreGoals.append(area);
 }
+makeScoreChoices(byId('scoreAuton'), byId('scoreAutonChoices'), [
+  ['', 'None', 'neutral'], ['red', 'Red +12', 'red'], ['tie', 'Tie +6', 'neutral'], ['blue', 'Blue +12', 'blue']
+]);
+byId('resetScore').onclick = () => {
+  if (confirm('Reset all scoring counts, Toggle colors and autonomous bonus? Active tracking will keep updating Toggle colors.')) resetLiveScore();
+};
 function calculateOverrideScore(areas, auton) {
   const score = {red: 0, blue: 0};
   for (const {counts, toggle} of areas) {
@@ -795,11 +878,25 @@ function calculateOverrideScore(areas, auton) {
 }
 function refreshLiveScore() {
   const areas = [...scoreGoals.children].map(area => ({
-    counts: [...area.querySelectorAll('input')].map(input => input.validity.valid ? Number(input.value) || 0 : 0),
+    counts: [...area.querySelectorAll('input')].sort((a, b) => Number(a.dataset.scoreOrder) - Number(b.dataset.scoreOrder)).map(input => input.validity.valid ? Number(input.value) || 0 : 0),
     toggle: area.querySelector('select')?.value
   }));
   const score = calculateOverrideScore(areas, byId('scoreAuton').value);
-  byId('scoreTotal').textContent = 'Red ' + score.red + ' · Blue ' + score.blue;
+  byId('redScore').textContent = score.red;
+  byId('blueScore').textContent = score.blue;
+  for (const row of scoreGoals.querySelectorAll('.score-counter')) {
+    const input = row.querySelector('input');
+    const count = Number(input.value) || 0;
+    row.querySelector('[data-delta="-1"]').disabled = count <= 0;
+    row.querySelector('[data-delta="1"]').disabled = !!input.max && count >= Number(input.max);
+  }
+  for (const container of [...scoreGoals.children, byId('scoreAuton').parentElement]) {
+    const select = container.querySelector('select');
+    if (!select) continue;
+    for (const button of container.querySelectorAll('.score-choice')) {
+      button.setAttribute('aria-pressed', String(button.dataset.value === select.value));
+    }
+  }
   if (previousScore) {
     const red = score.red - previousScore.red, blue = score.blue - previousScore.blue;
     const signed = value => value > 0 ? '+' + value : String(value);
