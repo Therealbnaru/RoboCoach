@@ -1026,7 +1026,11 @@ function drawToggleDebug() {
     const side = ['Left', 'Right', 'Top', 'Bottom'][detection.side] ?? 'Toggle';
     const label = side + ' · ' + Math.round(detection.confidence * 100) + '% · ' + (detection.color ?? 'unclear');
     context.strokeStyle = '#b9f47e';
-    context.strokeRect(x, y, boxWidth, boxHeight);
+    context.save();
+    context.translate(x + boxWidth / 2, y + boxHeight / 2);
+    context.rotate(detection.angle ?? 0);
+    context.strokeRect(-boxWidth / 2, -boxHeight / 2, boxWidth, boxHeight);
+    context.restore();
     const labelY = Math.max(0, y - 18);
     context.fillStyle = '#14191e';
     context.fillRect(x, labelY, context.measureText(label).width + 8, 18);
@@ -1070,16 +1074,16 @@ modelFile.onchange = async () => {
     runtime.env.wasm.wasmPaths = runtimeBase;
     runtime.env.wasm.numThreads = 1;
     session = await runtime.InferenceSession.create(await file.arrayBuffer(), {executionProviders: ['wasm']});
-    await runToggleModel({runtime, session}, new Float32Array(3 * modelSize * modelSize));
+    const probe = await runToggleModel({runtime, session}, new Float32Array(3 * modelSize * modelSize));
     const previous = toggleModel;
     toggleModel = {runtime, session};
     session = undefined;
     trackingGeneration++;
     previous?.session.release().catch(console.error);
-    modelStatus.textContent = file.name + ' loaded';
+    modelStatus.textContent = file.name + ' loaded · ' + (probe.dims[1] === 6 ? 'Rotated boxes (OBB)' : 'Detection boxes');
   } catch (error) {
     console.error(error);
-    modelStatus.textContent = 'Model could not be loaded. Use a 640×640 single-class YOLO11 ONNX detection export with NMS off.';
+    modelStatus.textContent = 'Could not load model: ' + String(error.message || error).slice(0, 220) + ' Supported: 640×640 single-class raw ONNX detection or OBB exports, NMS off.';
   } finally {
     session?.release().catch(console.error);
     modelFile.disabled = false;
@@ -1100,8 +1104,8 @@ async function runToggleModel({runtime, session}, pixels) {
   const tensor = new runtime.Tensor('float32', pixels, [1, 3, modelSize, modelSize]);
   const outputs = await session.run({[session.inputNames[0]]: tensor});
   const output = outputs[session.outputNames[0]];
-  if (output.dims.length !== 3 || output.dims[0] !== 1 || output.dims[1] !== 5)
-    throw new Error('Expected raw YOLO output shaped [1, 5, candidates].');
+  if (output.dims.length !== 3 || output.dims[0] !== 1 || ![5, 6].includes(output.dims[1]) || output.dims[2] < 1)
+    throw new Error('Expected single-class raw output [1, 5, N] or OBB [1, 6, N]; received [' + output.dims.join(', ') + '].');
   return output;
 }
 const modelFrame = document.createElement('canvas');
@@ -1126,24 +1130,34 @@ async function detectTogglePoints(model, anchors, source) {
     pixels[i + 2 * plane] = rgba[i * 4 + 2] / 255;
   }
   const {data, dims} = await runToggleModel(model, pixels);
+  return decodeTogglePoints(data, dims, anchors, {width, height, scale, dx, dy});
+}
+// Raw single-class exports: center x/y, width/height, confidence, optional radians.
+function decodeTogglePoints(data, dims, anchors, {width, height, scale, dx, dy}) {
   const count = dims[2];
+  const rotated = dims[1] === 6;
   const found = new Map();
   for (let i = 0; i < count; i++) {
     const confidence = data[4 * count + i];
     if (!Number.isFinite(confidence) || confidence < .5) continue;
     const x = (data[i] - dx) / (width * scale);
     const y = (data[count + i] - dy) / (height * scale);
-    if (!(x >= 0 && x <= 1 && y >= 0 && y <= 1)) continue;
+    const boxWidth = data[2 * count + i] / (width * scale);
+    const boxHeight = data[3 * count + i] / (height * scale);
+    const angle = rotated ? data[5 * count + i] : 0;
+    if (![x, y, boxWidth, boxHeight, angle].every(Number.isFinite) ||
+        x < 0 || x > 1 || y < 0 || y > 1 || boxWidth <= 0 || boxHeight <= 0) continue;
     let side, closest = .10;
     for (const [index, anchor] of anchors) {
       const distance = Math.hypot(x - anchor.x, y - anchor.y);
       if (distance < closest) { side = index; closest = distance; }
     }
     if (side !== undefined && confidence > (found.get(side)?.confidence ?? 0))
-      found.set(side, {x, y, confidence, side, width: data[2 * count + i] / (width * scale), height: data[3 * count + i] / (height * scale)});
+      found.set(side, {x, y, confidence, side, width: boxWidth, height: boxHeight, angle});
   }
   return found;
 }
+
 setInterval(async () => {
   const source = scoringVideo();
   if (modelBusy || !trackedToggles.size || scorePanel.hidden || !source || source.readyState < 2 || source.seeking) return;
