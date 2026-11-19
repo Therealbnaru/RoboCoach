@@ -917,6 +917,7 @@ function resetLiveScore() {
   scoreGoals.querySelectorAll('select').forEach(select => { select.value = ''; });
   byId('scoreAuton').value = '';
   byId('toggleTarget').selectedIndex = 0;
+  if (typeof trackedToggles !== 'undefined') for (const anchor of trackedToggles.values()) { anchor.pendingColor = undefined; anchor.pendingCount = 0; }
   previousScore = undefined;
   byId('scoreChange').textContent = '';
   refreshLiveScore();
@@ -955,7 +956,7 @@ byId('pickToggle').onclick = () => {
   pickToggleIndex = Number(byId('toggleTarget').value);
   byId('clearToggles').disabled = false;
   source.classList.add('pick-toggle');
-  trackingStatus.textContent = 'Click the center of the Toggle’s colored face in the video.';
+  trackingStatus.textContent = 'Click the field-facing colored strip, even if a different color covers most of the visible Toggle.';
 };
 for (const source of [video, liveTabVideo]) source.addEventListener('click', event => {
   if (pickToggleIndex === undefined || source !== scoringVideo()) return;
@@ -966,19 +967,43 @@ for (const source of [video, liveTabVideo]) source.addEventListener('click', eve
   const y = (event.clientY - bounds.top - (bounds.height - height) / 2) / height;
   if (x < 0 || x > 1 || y < 0 || y > 1) return;
   trackingGeneration++;
-  trackedToggles.set(pickToggleIndex, {x, y});
+  const detection = debugDetections.filter(d => {
+    const local = toggleFaceOffset(d, {x, y}, source.videoWidth, source.videoHeight);
+    return Math.abs(local.u) <= .65 && Math.abs(local.v) <= .65;
+  }).sort((a,b) => b.confidence-a.confidence)[0];
+  if (toggleModel && !detection) {
+    trackingStatus.textContent = 'Wait for a detection box over this Toggle, then click its field-facing strip inside the box.';
+    return;
+  }
+  const anchor = detection
+    ? {...detection, face: toggleFaceOffset(detection, {x, y}, source.videoWidth, source.videoHeight)}
+    : {x, y};
+  trackedToggles.set(pickToggleIndex, anchor);
   pickToggleIndex = undefined;
   source.classList.remove('pick-toggle');
-  trackingStatus.textContent = trackedToggles.size + ' tracked · Checks every 7 seconds';
+  lastToggleScoreCheck = -Infinity;
+  trackingStatus.textContent = trackedToggles.size + ' assigned · Reading the field-facing strip…';
+  checkToggleFrame();
 });
 video.addEventListener('seeking', () => {
   trackingGeneration++;
+  for (const anchor of trackedToggles.values()) { anchor.pendingColor = undefined; anchor.pendingCount = 0; }
   debugDetections = [];
   drawToggleDebug();
 });
+function toggleFaceOffset(box, point, width, height) {
+  const dx = (point.x-box.x)*width, dy = (point.y-box.y)*height;
+  const c = Math.cos(box.angle || 0), s = Math.sin(box.angle || 0);
+  return {u:(c*dx+s*dy)/(box.width*width), v:(-s*dx+c*dy)/(box.height*height)};
+}
+function toggleFacePoint(box, face, width, height) {
+  const dx=face.u*box.width*width, dy=face.v*box.height*height;
+  const c=Math.cos(box.angle || 0), s=Math.sin(box.angle || 0);
+  return {x:box.x+(c*dx-s*dy)/width, y:box.y+(s*dx+c*dy)/height};
+}
 function sampleToggleColor(x, y, source = liveTabVideo) {
   const width = source.videoWidth ?? source.width, height = source.videoHeight ?? source.height;
-  const side = Math.min(9, width, height);
+  const side = Math.min(3, width, height);
   sampleContext.drawImage(source, Math.max(0, Math.min(width - side, x * width - side / 2)),
     Math.max(0, Math.min(height - side, y * height - side / 2)), side, side, 0, 0, 9, 9);
   const pixels = sampleContext.getImageData(0, 0, 9, 9).data;
@@ -1025,13 +1050,21 @@ function drawToggleDebug() {
     const x = offsetX + detection.x * contentWidth - boxWidth / 2;
     const y = offsetY + detection.y * contentHeight - boxHeight / 2;
     const side = ['Left', 'Right', 'Top', 'Bottom'][detection.side] ?? 'Toggle';
-    const label = side + ' · ' + Math.round(detection.confidence * 100) + '% · ' + (detection.color ?? 'unclear');
+    const label = side + ' · ' + Math.round(detection.confidence * 100) + '% · ' + (detection.color ?? (detection.side === undefined ? 'face not set' : 'unclear'));
     context.strokeStyle = '#b9f47e';
     context.save();
     context.translate(x + boxWidth / 2, y + boxHeight / 2);
     context.rotate(detection.angle ?? 0);
     context.strokeRect(-boxWidth / 2, -boxHeight / 2, boxWidth, boxHeight);
     context.restore();
+    if (detection.sample) {
+      context.beginPath();
+      context.arc(offsetX+detection.sample.x*contentWidth, offsetY+detection.sample.y*contentHeight, 4, 0, Math.PI*2);
+      context.fillStyle='#fff';
+      context.fill();
+      context.strokeStyle='#15191f';
+      context.stroke();
+    }
     const labelY = Math.max(0, y - 18);
     context.fillStyle = '#14191e';
     context.fillRect(x, labelY, context.measureText(label).width + 8, 18);
@@ -1214,7 +1247,7 @@ async function checkToggleFrame() {
   const preview = toggleDevMode.checked && !!toggleModel;
   if (modelBusy || (!trackedToggles.size && !preview) || scorePanel.hidden ||
       !source || source.readyState < 2 || source.seeking || document.hidden) return;
-  const updateScore = performance.now() - lastToggleScoreCheck >= 7000;
+  const updateScore = performance.now() - lastToggleScoreCheck >= 1000;
   if (!preview && !updateScore) return;
   modelBusy = true;
   const generation = trackingGeneration;
@@ -1224,15 +1257,24 @@ async function checkToggleFrame() {
     const points = model ? await detectTogglePoints(model, trackedToggles, source) : trackedToggles;
     if (generation !== trackingGeneration || scorePanel.hidden || source !== scoringVideo() || model !== toggleModel) return;
     debugDetections = model ? points.detections : [];
-    for (const detection of debugDetections)
-      detection.color = sampleToggleColor(detection.x, detection.y, modelFrame);
+    for (const detection of debugDetections) detection.color = undefined;
     if (updateScore && trackedToggles.size) {
       lastToggleScoreCheck = performance.now();
-      for (const index of trackedToggles.keys()) {
+      for (const [index, anchor] of trackedToggles) {
         const point = points.get(index);
-        const color = point && sampleToggleColor(point.x, point.y, model ? modelFrame : source);
-        if (!color) { uncertain++; continue; }
-        scoreGoals.children[index].querySelector('select').value = color === 'neutral' ? '' : color;
+        const sample = point && (model
+          ? anchor.face && toggleFacePoint(point, anchor.face, source.videoWidth, source.videoHeight)
+          : point);
+        const color = sample && sample.x >= 0 && sample.x <= 1 && sample.y >= 0 && sample.y <= 1
+          ? sampleToggleColor(sample.x, sample.y, model ? modelFrame : source) : undefined;
+        const overlay = debugDetections.find(d => d.side === index);
+        if (overlay) { overlay.sample = sample; overlay.color = color; }
+        if (!color) { anchor.pendingColor = undefined; anchor.pendingCount = 0; uncertain++; continue; }
+        anchor.pendingCount = anchor.pendingColor === color ? (anchor.pendingCount || 0)+1 : 1;
+        anchor.pendingColor = color;
+        // Two consecutive readings avoid changing ownership on a single noisy frame.
+        if (anchor.pendingCount >= 2)
+          scoreGoals.children[index].querySelector('select').value = color === 'neutral' ? '' : color;
       }
       refreshLiveScore();
     }
@@ -1241,7 +1283,7 @@ async function checkToggleFrame() {
       ? debugDetections.length + ' Toggle detection(s) · Preview updates about every second. '
       : '';
     trackingStatus.textContent = previewStatus + (trackedToggles.size
-      ? trackedToggles.size + ' assigned · Score checks every 7 seconds.' + (uncertain ? ' Unclear colors kept unchanged.' : '')
+      ? trackedToggles.size + ' assigned · Field-facing color checks every second; changes settle after two readings.' + (uncertain ? ' Unclear colors kept unchanged.' : '')
       : 'Pick on video to assign Left / Right / Top / Bottom. Preview alone does not change scores.');
   } catch (error) {
     if (generation === trackingGeneration) {
