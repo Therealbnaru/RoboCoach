@@ -375,6 +375,7 @@ function loadMatch(match, blob, review) {
   context.clearRect(0, 0, ink.width, ink.height);
   url = URL.createObjectURL(blob);
   video.src = url;
+  resetLiveScore();
 }
 async function changeMatch(action) {
   if (switching) return;
@@ -906,8 +907,10 @@ function refreshLiveScore() {
 }
 function showLiveScore(show) {
   scorePanel.hidden = !show;
+  byId('videoReview').classList.toggle('scoring-active', show);
   scoreButton.textContent = show ? 'Hide live score' : 'Live score';
   scoreButton.setAttribute('aria-expanded', String(show));
+  if (show) refreshLiveScore();
 }
 function resetLiveScore() {
   scoreGoals.querySelectorAll('input[type="number"]').forEach(input => { input.value = '0'; });
@@ -934,32 +937,44 @@ function stopToggleTracking() {
   byId('clearToggles').disabled = true;
   pickToggleIndex = undefined;
   liveTabVideo.classList.remove('pick-toggle');
+  video.classList.remove('pick-toggle');
   trackingStatus.textContent = '';
 }
 byId('clearToggles').onclick = stopToggleTracking;
+function scoringVideo() {
+  if (liveTabStream) return liveTabVideo.hidden ? null : liveTabVideo;
+  return youtubeVideo.hidden && video.readyState >= 2 ? video : null;
+}
 byId('pickToggle').onclick = () => {
-  if (liveTabVideo.hidden || drawingLive || liveTabVideo.readyState < 2) {
-    trackingStatus.textContent = 'Return to the playing feed and exit Draw live to pick a Toggle.';
+  const source = scoringVideo();
+  if (!source || drawingLive || !frozenLiveFrame.hidden || source.readyState < 2) {
+    trackingStatus.textContent = 'Open an uploaded video or return to the live feed, then exit drawing mode to pick a Toggle.';
     return;
   }
+  setPen(false);
   pickToggleIndex = Number(byId('toggleTarget').value);
   byId('clearToggles').disabled = false;
-  liveTabVideo.classList.add('pick-toggle');
-  trackingStatus.textContent = 'Click the center of the Toggle’s colored face in the feed.';
+  source.classList.add('pick-toggle');
+  trackingStatus.textContent = 'Click the center of the Toggle’s colored face in the video.';
 };
-liveTabVideo.addEventListener('click', event => {
-  if (pickToggleIndex === undefined) return;
-  const bounds = liveTabVideo.getBoundingClientRect();
-  const scale = Math.min(bounds.width / liveTabVideo.videoWidth, bounds.height / liveTabVideo.videoHeight);
-  const width = liveTabVideo.videoWidth * scale, height = liveTabVideo.videoHeight * scale;
+for (const source of [video, liveTabVideo]) source.addEventListener('click', event => {
+  if (pickToggleIndex === undefined || source !== scoringVideo()) return;
+  const bounds = source.getBoundingClientRect();
+  const scale = Math.min(bounds.width / source.videoWidth, bounds.height / source.videoHeight);
+  const width = source.videoWidth * scale, height = source.videoHeight * scale;
   const x = (event.clientX - bounds.left - (bounds.width - width) / 2) / width;
   const y = (event.clientY - bounds.top - (bounds.height - height) / 2) / height;
   if (x < 0 || x > 1 || y < 0 || y > 1) return;
   trackingGeneration++;
   trackedToggles.set(pickToggleIndex, {x, y});
   pickToggleIndex = undefined;
-  liveTabVideo.classList.remove('pick-toggle');
+  source.classList.remove('pick-toggle');
   trackingStatus.textContent = trackedToggles.size + ' tracked · Checks every 7 seconds';
+});
+video.addEventListener('seeking', () => {
+  trackingGeneration++;
+  debugDetections = [];
+  drawToggleDebug();
 });
 function sampleToggleColor(x, y, source = liveTabVideo) {
   const width = source.videoWidth ?? source.width, height = source.videoHeight ?? source.height;
@@ -989,15 +1004,17 @@ toggleDevMode.onchange = () => {
 };
 function drawToggleDebug() {
   if (debugOverlay.hidden) return;
-  const width = liveTabVideo.clientWidth, height = liveTabVideo.clientHeight;
-  if (!width || !height || !liveTabVideo.videoWidth || !liveTabVideo.videoHeight) return;
+  const source = scoringVideo();
+  if (!source) { debugOverlay.getContext('2d').clearRect(0, 0, debugOverlay.width, debugOverlay.height); return; }
+  const width = source.clientWidth, height = source.clientHeight;
+  if (!width || !height || !source.videoWidth || !source.videoHeight) return;
   const ratio = window.devicePixelRatio || 1;
   debugOverlay.width = Math.round(width * ratio);
   debugOverlay.height = Math.round(height * ratio);
   const context = debugOverlay.getContext('2d');
   context.scale(ratio, ratio);
-  const scale = Math.min(width / liveTabVideo.videoWidth, height / liveTabVideo.videoHeight);
-  const contentWidth = liveTabVideo.videoWidth * scale, contentHeight = liveTabVideo.videoHeight * scale;
+  const scale = Math.min(width / source.videoWidth, height / source.videoHeight);
+  const contentWidth = source.videoWidth * scale, contentHeight = source.videoHeight * scale;
   const offsetX = (width - contentWidth) / 2, offsetY = (height - contentHeight) / 2;
   context.font = '12px system-ui';
   context.lineWidth = 2;
@@ -1017,7 +1034,9 @@ function drawToggleDebug() {
     context.fillText(label, x + 4, labelY + 13);
   }
 }
-new ResizeObserver(drawToggleDebug).observe(liveTabVideo);
+const scoreResize = new ResizeObserver(drawToggleDebug);
+scoreResize.observe(liveTabVideo);
+scoreResize.observe(video);
 let trackingGeneration = 0;
 const modelFile = byId('toggleModelFile');
 const modelStatus = byId('toggleModelStatus');
@@ -1089,10 +1108,10 @@ const modelFrame = document.createElement('canvas');
 const modelInput = document.createElement('canvas');
 modelInput.width = modelInput.height = modelSize;
 const modelInputContext = modelInput.getContext('2d', {willReadFrequently: true});
-async function detectTogglePoints(model, anchors) {
-  const width = modelFrame.width = liveTabVideo.videoWidth;
-  const height = modelFrame.height = liveTabVideo.videoHeight;
-  modelFrame.getContext('2d').drawImage(liveTabVideo, 0, 0);
+async function detectTogglePoints(model, anchors, source) {
+  const width = modelFrame.width = source.videoWidth;
+  const height = modelFrame.height = source.videoHeight;
+  modelFrame.getContext('2d').drawImage(source, 0, 0);
   const scale = Math.min(modelSize / width, modelSize / height);
   const dx = (modelSize - width * scale) / 2, dy = (modelSize - height * scale) / 2;
   modelInputContext.fillStyle = '#727272';
@@ -1126,18 +1145,19 @@ async function detectTogglePoints(model, anchors) {
   return found;
 }
 setInterval(async () => {
-  if (modelBusy || !trackedToggles.size || scorePanel.hidden || liveTabVideo.hidden || liveTabVideo.readyState < 2) return;
+  const source = scoringVideo();
+  if (modelBusy || !trackedToggles.size || scorePanel.hidden || !source || source.readyState < 2 || source.seeking) return;
   modelBusy = true;
   const generation = trackingGeneration;
   let uncertain = 0;
   try {
     const model = toggleModel;
-    const points = model ? await detectTogglePoints(model, trackedToggles) : trackedToggles;
-    if (generation !== trackingGeneration || scorePanel.hidden || liveTabVideo.hidden) return;
+    const points = model ? await detectTogglePoints(model, trackedToggles, source) : trackedToggles;
+    if (generation !== trackingGeneration || scorePanel.hidden || source !== scoringVideo()) return;
     debugDetections = model ? [...points.values()] : [];
     for (const index of trackedToggles.keys()) {
       const point = points.get(index);
-      const color = point && sampleToggleColor(point.x, point.y, model ? modelFrame : liveTabVideo);
+      const color = point && sampleToggleColor(point.x, point.y, model ? modelFrame : source);
       if (model && point) point.color = color;
       if (!color) { uncertain++; continue; }
       scoreGoals.children[index].querySelector('select').value = color === 'neutral' ? '' : color;
@@ -1305,7 +1325,7 @@ function stopLiveTab(message = reviewHint) {
   if (drawingLive) setLiveDrawing(false);
   drawLiveTab.hidden = true;
   freezeLiveTab.hidden = true;
-  scoreButton.hidden = true;
+  scoreButton.hidden = false;
   showLiveScore(false);
   stopToggleTracking();
   liveSourceLink.hidden = true;
