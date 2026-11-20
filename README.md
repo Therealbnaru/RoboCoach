@@ -54,6 +54,18 @@ Detection/color checks run about once per second when active; actual speed depen
 
 **Current limits:** Pin and cup scoring inputs are manual. The Toggle model locates the object; a separate color sampler estimates its state. The sampler follows a calibrated location relative to the detected box, but substantial camera movement, changed perspective, or occlusion may require recalibration. Model predictions are not official referee scores.
 
+## Research artifacts you can inspect
+
+- [Downloadable model checkpoints and ONNX](./models/README.md)
+- [Training workflow, experiment results, and limitations](./docs/TRAINING.md)
+- [Configurable training notebook](./notebooks/train_obb.ipynb)
+- [Original development notebook, cleaned of outputs](./notebooks/YOLO_OVERRIDE_DETECTION.ipynb)
+- [Toggle training results](./experiments/toggle/results.csv) and [pins/cups training results](./experiments/pins/results.csv)
+
+![Early five-class detection preview at confidence 0.25](./experiments/pins/preview-025.jpg)
+
+This is a validation-frame preview from the early pins/cups experiment, not proof of complete scoring or independent-video accuracy. See the training guide for footage attribution and evaluation details.
+
 ## Computer vision work completed
 
 ### Dataset and training workflow
@@ -176,4 +188,4 @@ Training currently happens separately in Colab, with datasets and model artifact
 | [styles.css](./styles.css) | Layout and styling |
 | [app.js](./app.js) | Video review, local storage, scouting, planners, scoring, and browser inference |
 
-The app is hosted on GitHub Pages. Training notebooks, datasets, and model weights have been managed separately; they are not bundled into this repository.
+The app is hosted on GitHub Pages. Cleaned notebooks, selected model weights, and evaluation artifacts are now included in this repository. Full training videos and datasets remain separately managed in Drive. See the research links above.

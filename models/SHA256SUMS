@@ -1,0 +1,3 @@
+1450985bdcc3f846828a72486845185386bfc2f95663a3c09189fc642959ef1a  models/toggle/best.pt
+71372a7de7d11da3b723ceb434cdfc70ce235ccceed53c1197c7499a4ce8590e  models/toggle/best.onnx
+5ababd9c58b805be805d8a795b4ab9331b73ecd76534a2738fe7cfd2288ff136  models/pins/best.pt
