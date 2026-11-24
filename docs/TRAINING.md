@@ -126,7 +126,7 @@ YOLO("models/toggle/best.pt").export(
 
 The supplied ONNX has input [1, 3, 640, 640] and output [1, 6, 8400]. Its class and shapes were inspected directly from the file. Inference was not executed as part of packaging.
 
-The browser loader currently supports **single-class Toggle models only**. The five-class checkpoint is for Python evaluation and further training; supporting it in the app requires multi-class decoding and scoring logic.
+The Toggle loader supports single-class Toggle models. The separate pins-and-goals loader supports the current two-class raw OBB model described below. The historical five-class checkpoint is not compatible with either loader.
 
 ## Next experiments
 
@@ -136,3 +136,53 @@ The browser loader currently supports **single-class Toggle models only**. The f
 - Evaluate color-preserving augmentation choices.
 - Test on independent videos before integrating automatic pin/cup counting.
 - Keep object detection metrics separate from scoring and coaching accuracy.
+
+
+## Stacked-pin and goal development
+
+The initial color-specific pin classes were merged into a single pin-half class, with color sampling explored separately. The training set grew from four hand-labeled screenshots (116 pin halves), to seven (162), thirteen (257), and fourteen (268, including one reviewed Skills frame). Labels temporarily named Toggle in the pin-only screenshot exports were remapped only where they represented pin halves; actual Toggles in Skills footage were excluded from the pin dataset. Cups were removed from this model.
+
+Small-dataset diagnostics exposed too few optimizer updates with batch=4 and nbs=64. Subsequent runs used batch=4 and nbs=4, with warmup_epochs=0, so gradient accumulation did not stretch across many tiny epochs. Diagnostic fine-tuning disabled geometric and HSV augmentations. This was a controlled small-data setup, not an established optimal training recipe.
+
+### pins-goals-100
+
+- Source export: Full Finals goals pins.zip; labels PIN and Goals remapped to stacked_pin_half (0) and goal (1).
+- CVAT step=100, start_frame=0; selected sampled timesteps 0 through 43 inclusive.
+- Missing exported image timesteps: 0, 30, 31, 34, 35, 40. Used the remaining 38 without inventing images or labels.
+- First 30 available images: 393 pin-half boxes and 210 goal boxes.
+- Final 8 available images: 231 pin-half boxes and 56 goal boxes.
+- Continued from stacked-pins-with-skills-100/weights/best.pt; 100 epochs, imgsz=960, batch=nbs=4, AdamW lr0=0.0003, warmup_epochs=0, CPU. Training completed in 1.823 hours.
+- The class head was expanded from one to two classes, retaining the matching pin class by name.
+- Metrics below are from the console validation of the selected best.pt, as supplied by the author; latest weights, CSVs, and preview images have not been added to this repository.
+
+| Class | Precision | Recall | mAP50 | mAP50–95 |
+| --- | ---: | ---: | ---: | ---: |
+| stacked_pin_half | 0.951 | 0.775 | 0.915 | 0.753 |
+| goal | 0.851 | 0.893 | 0.875 | 0.783 |
+| all | 0.901 | 0.834 | 0.895 | 0.768 |
+
+The split is chronological within one video. Adjacent frames are correlated; these metrics do not measure performance on new venues or camera angles, and are not scoring accuracy. Historical validation sets and class policies differ, so do not interpret their mAP differences as a controlled comparison.
+
+### Pins and goals browser preview
+
+Export the latest checkpoint in Colab:
+
+```python
+from ultralytics import YOLO
+
+exported = YOLO(
+    "/content/drive/MyDrive/RoboCoach/pins-goals-100/weights/best.pt"
+).export(
+    format="onnx", imgsz=960, batch=1,
+    dynamic=False, half=False, opset=17, simplify=True,
+    end2end=False, nms=False,
+)
+```
+
+The browser expects float32 input [1,3,960,960] and raw output [1,7,N]: center x/y, width/height, two class confidence channels, and angle in radians. Class 0 must be stacked_pin_half and class 1 goal. An incompatible output is rejected with an explanatory message. This contract is implemented in the loader; the latest exported artifact has not yet been independently inspected or run in the browser.
+
+Download the export and open RoboCoach. Open a local video or share a browser tab, click Live score, and choose the ONNX under Pins and goals model. Keep Show boxes checked. Blue boxes represent pin halves; green boxes represent goals. The confidence slider defaults to 0.25. The existing Toggle model can remain loaded separately.
+
+The preview applies letterboxing, class-aware rotated-box duplicate suppression, and displays counts without box-label text. It does not assign goal identities, sample pin colors, prove stack support, or change manual scoring counts. Synthetic runtime checks covered loading, letterbox inference, duplicate filtering across classes, box colors, unloading, and incompatible-export rejection; actual exported-model browser verification remains pending.
+
+Next steps are independent-video evaluation, robust pin-to-goal association with uncertainty and manual correction, temporal tracking, and only then structured score events for the planned LLM coach. A nearby goal in a 2D image alone is not proof that a pin is scored.
