@@ -6,7 +6,7 @@ These are versioned research checkpoints from the author's Google Drive runs, co
 | --- | --- | --- |
 | [toggle/best.onnx](./toggle/best.onnx) | Single-class Toggle inference, YOLO26n-OBB | Yes |
 | [toggle/best.pt](./toggle/best.pt) | Toggle evaluation and further training in Python | No; export ONNX for the app |
-| [pins/best.pt](./pins/best.pt) | Experimental Toggle + red/blue/yellow halves + cup model | No; app multi-class support is planned |
+| [pins/best.pt](./pins/best.pt) | Experimental Toggle + red/blue/yellow halves + cup model | No; this historical five-class model is unsupported |
 
 The ONNX is approximately 10 MB; the PyTorch checkpoints are approximately 5.7 MB each. Use the file's **Download raw file** option on GitHub to save the binary, rather than saving its HTML preview page.
 
@@ -39,3 +39,9 @@ The file's interface and metadata were inspected; no new inference benchmark was
 - Dataset splits, evaluation artifacts, and metric caveats are documented in [the training guide](../docs/TRAINING.md).
 - Full videos and datasets remain outside the repository. The historical notebook's outputs and account metadata have been removed.
 - Upstream Ultralytics software/model terms apply. Inclusion here does not waive upstream license requirements or grant rights to third-party training footage.
+
+## Latest pins-and-goals model
+
+The app now has a separate two-class pins-and-goals ONNX preview loader. The latest run is pins-goals-100, trained for 100 epochs at 960×960 with class 0 stacked_pin_half and class 1 goal. These newer weights are still managed in Drive and are **not** the historical pins/best.pt linked above.
+
+See the [latest results and export instructions](../docs/TRAINING.md#pins-and-goals-browser-preview). Export with end2end=False and nms=False, then load the downloaded file under Live score → Pins and goals model. Required raw output is [1,7,N]. Blue and green boxes are detection previews; manual scoring remains separate. Real exported-model browser verification is pending.
