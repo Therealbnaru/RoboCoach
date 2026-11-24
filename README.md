@@ -6,7 +6,7 @@ RoboCoach is a browser app for VEX V5 robotics teams to review matches, scout te
 
 The long-term goal is an AI coach that connects video evidence, score swings, autonomous performance, and scouting information to explain **how a match unfolded, why a team may have lost, and what to practice or change next**.
 
-This is an active prototype. Video review, scouting, route planning, manual score calculation, and experimental Toggle detection are implemented. Full automatic match scoring and the coaching chatbot are planned.
+This is an active prototype. Video review, scouting, route planning, manual score calculation, experimental Toggle tracking, and pins-and-goals detection previews are implemented. Full automatic match scoring and the coaching chatbot are planned.
 
 ## What you can use today
 
@@ -38,7 +38,7 @@ Direct YouTube playback and shared-tab capture are different modes. The embedded
 
 Skills data uses CSV import; this is not an automatic OpenScout statistics feed.
 
-### Scoring and Toggle detection
+### Scoring and model previews
 
 The **Live score** panel works alongside uploaded-video playback and shared-tab feeds.
 
@@ -52,7 +52,9 @@ The **Live score** panel works alongside uploaded-video playback and shared-tab 
 
 Detection/color checks run about once per second when active; actual speed depends on the device. The interface keeps the previous state when a reading is unclear.
 
-**Current limits:** Pin and cup scoring inputs are manual. The Toggle model locates the object; a separate color sampler estimates its state. The sampler follows a calibrated location relative to the detected box, but substantial camera movement, changed perspective, or occlusion may require recalibration. Model predictions are not official referee scores.
+A separate **Pins and goals model** loader accepts the new two-class, 960×960 raw OBB ONNX export. It draws blue pin-half boxes and green goal boxes without text labels, reports detection counts, and provides a confidence slider (default 0.25). It works with uploaded videos and shared-tab feeds independently of the Toggle loader. Preview inference runs about once per second when the scoring panel is open, subject to device speed.
+
+**Current limits:** Pin-half scoring inputs remain manual. Detection counts do not establish scoring eligibility or automatically update the score. The Toggle model locates the object; a separate color sampler estimates its state. The sampler follows a calibrated location relative to the detected box, but substantial camera movement, changed perspective, or occlusion may require recalibration. Model predictions are not official referee scores.
 
 ## Research artifacts you can inspect
 
@@ -124,19 +126,35 @@ This is an early experiment: validation comes from the same video, and pin/cup d
 
 **The five-class model is not integrated into the app yet.** More varied labeling, annotation review, and evaluation are the current priorities. Old Toggle-only frames cannot simply be treated as fully labeled examples for the new classes.
 
+### Current pins-and-goals experiment
+
+The pin workflow moved from separate red/blue/yellow classes to a color-independent **stacked_pin_half** detector. Color estimation was explored separately; low-saturation blue halves and small distant objects remain challenges. Cup detection was removed from this experiment, and a **goal** class was added to support future association of halves with their goal bases.
+
+The latest run, **pins-goals-100**, fine-tuned the preceding pin model for **100 epochs at 960×960**. The new CVAT export used frame step 100. Timesteps 0–43 were selected; six missing exported images left **38 images**, split chronologically into **30 training / 8 validation**. These contained 393 training pin halves and 210 goals, plus 231 validation pin halves and 56 goals.
+
+| Best-checkpoint validation | Precision | Recall | mAP50 | mAP50–95 |
+| --- | ---: | ---: | ---: | ---: |
+| Stacked pin half | 95.1% | 77.5% | 91.5% | 75.3% |
+| Goal | 85.1% | 89.3% | 87.5% | 78.3% |
+| Overall | 90.1% | 83.4% | 89.5% | 76.8% |
+
+These are results reported by the Colab run on neighboring frames from the **same video**, not independent-video or scoring accuracy. They are not directly comparable with the older five-class experiment because the labels and evaluation data changed. The latest weights and validation artifacts remain in Drive; the bundled `models/pins/best.pt` is still the historical five-class checkpoint.
+
+To try the new model, export it using the [pins-and-goals export instructions](./docs/TRAINING.md#pins-and-goals-browser-preview), download the ONNX, open a video in RoboCoach, select **Live score**, and load it under **Pins and goals model**. The browser integration passed synthetic checks for loading, decoding, class-aware duplicate filtering, colors, unloading, and unsupported-output rejection. Real inference with the user's latest exported ONNX still needs verification in the app.
+
 ## Roadmap toward an AI coach
 
 ### 1. Reliable object detection
 
 - Expand labels across venues, lighting, camera angles, stacks, piles, and partial obstructions.
-- Improve red/blue pin-half and cup recognition.
+- Improve recall for distant and occluded stacked pin halves, especially blue halves under weak lighting.
 - Evaluate resolution and augmentation settings for small, color-specific objects.
 - Test on held-out match videos and report per-class results.
-- Extend browser inference to the five-class model.
+- Verify the new two-class browser preview on real exported weights and independent footage.
 
 ### 2. Understand field state and estimate score
 
-Object detection alone cannot determine the score. RoboCoach needs to establish scoring areas and relationships: which halves belong to which stacks or cups, what is settled versus moving, and which alliance owns each relevant area.
+Object detection alone cannot determine the score. RoboCoach needs to establish scoring areas and relationships: which halves belong to which goal-supported stacks, what is settled versus moving, and which alliance owns each relevant area.
 
 Planned work includes camera/field calibration, handling moving cameras, temporal consistency, duplicate prevention, uncertainty indicators, and manual corrections. Score rules should be calculated explicitly from structured field state.
 
@@ -186,6 +204,7 @@ Training currently happens separately in Colab, with datasets and model artifact
 | --- | --- |
 | [index.html](./index.html) | App structure and controls |
 | [styles.css](./styles.css) | Layout and styling |
-| [app.js](./app.js) | Video review, local storage, scouting, planners, scoring, and browser inference |
+| [app.js](./app.js) | Video review, local storage, scouting, planners, scoring, and Toggle inference |
+| [pins-goals.js](./pins-goals.js) | Separate pins-and-goals ONNX loader and box preview |
 
 The app is hosted on GitHub Pages. Cleaned notebooks, selected model weights, and evaluation artifacts are now included in this repository. Full training videos and datasets remain separately managed in Drive. See the research links above.
