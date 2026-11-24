@@ -534,8 +534,26 @@ reviewResize.observe(frozenLiveFrame);
 
 const videoReview = byId('videoReview');
 const fullscreenReview = byId('fullscreenReview');
+const fullscreenTools = document.createElement('button');
+fullscreenTools.type = 'button';
+fullscreenTools.className = 'fullscreen-tools-toggle';
+fullscreenTools.textContent = 'Drawing tools';
+fullscreenTools.setAttribute('aria-expanded', 'false');
+fullscreenTools.onclick = () => {
+  const open = videoReview.classList.toggle('fullscreen-tools-open');
+  fullscreenTools.setAttribute('aria-expanded', String(open));
+  if (!open) setPen(false);
+};
+fullscreenReview.before(fullscreenTools);
 function setReviewExpanded(expanded) {
   videoReview.classList.toggle('review-expanded', expanded);
+  videoReview.classList.remove('fullscreen-tools-open', 'fullscreen-score-open');
+  fullscreenTools.setAttribute('aria-expanded', 'false');
+  if (expanded) setPen(false);
+  if (typeof scoreButton !== 'undefined') {
+    scoreButton.textContent = expanded ? 'Score & models' : scorePanel.hidden ? 'Live score' : 'Hide live score';
+    scoreButton.setAttribute('aria-expanded', String(!expanded && !scorePanel.hidden));
+  }
   fullscreenReview.textContent = expanded ? 'Exit fullscreen' : 'Fullscreen';
   fullscreenReview.setAttribute('aria-pressed', String(expanded));
 }
@@ -922,7 +940,14 @@ function resetLiveScore() {
   byId('scoreChange').textContent = '';
   refreshLiveScore();
 }
-scoreButton.onclick = () => showLiveScore(scorePanel.hidden);
+scoreButton.onclick = () => {
+  if (videoReview.classList.contains('review-expanded')) {
+    const open = videoReview.classList.toggle('fullscreen-score-open');
+    if (open && scorePanel.hidden) showLiveScore(true);
+    scoreButton.textContent = open ? 'Close score panel' : 'Score & models';
+    scoreButton.setAttribute('aria-expanded', String(open));
+  } else showLiveScore(scorePanel.hidden);
+};
 scorePanel.oninput = refreshLiveScore;
 const trackedToggles = new Map();
 const sampleCanvas = document.createElement('canvas');
