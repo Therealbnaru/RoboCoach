@@ -1145,10 +1145,7 @@ const scoreResize = new ResizeObserver(drawToggleDebug);
 scoreResize.observe(liveTabVideo);
 scoreResize.observe(video);
 let trackingGeneration = 0;
-const modelFile = byId('toggleModelFile');
 const modelStatus = byId('toggleModelStatus');
-const unloadModel = byId('unloadToggleModel');
-const modelSize = 640;
 const runtimeBase = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/';
 let runtimeLoading;
 function loadToggleRuntime() {
@@ -1165,97 +1162,12 @@ function loadToggleRuntime() {
     document.head.append(script);
   });
 }
-modelFile.onchange = async () => {
-  const file = modelFile.files[0];
-  modelFile.value = '';
-  if (!file) return;
-  modelFile.disabled = unloadModel.disabled = true;
-  modelStatus.textContent = 'Loading model…';
-  let session;
-  try {
-    const runtime = await loadToggleRuntime();
-    runtime.env.wasm.wasmPaths = runtimeBase;
-    runtime.env.wasm.numThreads = 1;
-    session = await runtime.InferenceSession.create(await file.arrayBuffer(), {executionProviders: ['wasm']});
-    const probe = await runToggleModel({runtime, session}, new Float32Array(3 * modelSize * modelSize));
-    const previous = toggleModel;
-    toggleModel = {runtime, session};
-    session = undefined;
-    trackingGeneration++;
-    previous?.session.release().catch(console.error);
-    modelStatus.textContent = file.name + ' loaded · ' + (probe.dims[1] === 6 ? 'Rotated boxes (OBB)' : 'Detection boxes');
-    checkToggleFrame();
-  } catch (error) {
-    console.error(error);
-    modelStatus.textContent = 'Could not load model: ' + String(error.message || error).slice(0, 220) + ' Supported: 640×640 single-class raw ONNX detection or OBB exports, NMS off.';
-  } finally {
-    session?.release().catch(console.error);
-    modelFile.disabled = false;
-    unloadModel.disabled = !toggleModel;
-  }
-};
-unloadModel.onclick = () => {
-  const previous = toggleModel;
-  toggleModel = undefined;
-  trackingGeneration++;
-  unloadModel.disabled = true;
-  modelStatus.textContent = 'Color sampling active';
-  debugDetections = [];
-  drawToggleDebug();
-  previous?.session.release().catch(console.error);
-};
-async function runToggleModel({runtime, session}, pixels) {
-  const tensor = new runtime.Tensor('float32', pixels, [1, 3, modelSize, modelSize]);
-  const outputs = await session.run({[session.inputNames[0]]: tensor});
-  const output = outputs[session.outputNames[0]];
-  if (output.dims.length !== 3 || output.dims[0] !== 1 || ![5, 6].includes(output.dims[1]) || output.dims[2] < 1)
-    throw new Error('Expected single-class raw output [1, 5, N] or OBB [1, 6, N]; received [' + output.dims.join(', ') + '].');
-  return output;
-}
+// One shared ONNX inference supplies Toggle detections from vision-model.js.
 const modelFrame = document.createElement('canvas');
-const modelInput = document.createElement('canvas');
-modelInput.width = modelInput.height = modelSize;
-const modelInputContext = modelInput.getContext('2d', {willReadFrequently: true});
-async function detectTogglePoints(model, anchors, source) {
-  const width = modelFrame.width = source.videoWidth;
-  const height = modelFrame.height = source.videoHeight;
-  modelFrame.getContext('2d').drawImage(source, 0, 0);
-  const scale = Math.min(modelSize / width, modelSize / height);
-  const dx = (modelSize - width * scale) / 2, dy = (modelSize - height * scale) / 2;
-  modelInputContext.fillStyle = '#727272';
-  modelInputContext.fillRect(0, 0, modelSize, modelSize);
-  modelInputContext.drawImage(modelFrame, dx, dy, width * scale, height * scale);
-  const rgba = modelInputContext.getImageData(0, 0, modelSize, modelSize).data;
-  const plane = modelSize * modelSize;
-  const pixels = new Float32Array(plane * 3);
-  for (let i = 0; i < plane; i++) {
-    pixels[i] = rgba[i * 4] / 255;
-    pixels[i + plane] = rgba[i * 4 + 1] / 255;
-    pixels[i + 2 * plane] = rgba[i * 4 + 2] / 255;
-  }
-  const {data, dims} = await runToggleModel(model, pixels);
-  return decodeTogglePoints(data, dims, anchors, {width, height, scale, dx, dy});
-}
-// Raw single-class exports: center x/y, width/height, confidence, optional radians.
-function decodeTogglePoints(data, dims, anchors, {width, height, scale, dx, dy}) {
-  const count = dims[2];
-  const rotated = dims[1] === 6;
-  const found = new Map();
-  const candidates = [];
-  for (let i = 0; i < count; i++) {
-    const confidence = data[4 * count + i];
-    if (!Number.isFinite(confidence) || confidence < .25) continue;
-    const x = (data[i] - dx) / (width * scale);
-    const y = (data[count + i] - dy) / (height * scale);
-    const boxWidth = data[2 * count + i] / (width * scale);
-    const boxHeight = data[3 * count + i] / (height * scale);
-    const angle = rotated ? data[5 * count + i] : 0;
-    if (![x, y, boxWidth, boxHeight, angle].every(Number.isFinite) ||
-        x < 0 || x > 1 || y < 0 || y > 1 || boxWidth <= 0 || boxHeight <= 0) continue;
-    candidates.push({x, y, confidence, width: boxWidth, height: boxHeight, angle});
-  }
-  const detections = suppressToggleDuplicates(candidates, width, height);
-  found.detections = detections;
+let unifiedTogglePoints;
+function associateTogglePoints(detections, anchors) {
+  const found=new Map();
+  found.detections=detections;
   for (const detection of detections) {
     const {x, y, confidence} = detection;
     if (confidence < .5) continue;
@@ -1270,6 +1182,32 @@ function decodeTogglePoints(data, dims, anchors, {width, height, scale, dx, dy})
   }
   return found;
 }
+window.RoboCoachVision={
+  loaded(kind) {
+    stopToggleTracking();
+    toggleModel={unified:true,hasToggles:kind!=='pins-goals'};
+    unifiedTogglePoints=undefined;
+    debugOverlay.hidden=!toggleDevMode.checked;
+    byId('toggleModelControls').hidden=!toggleDevMode.checked;
+    trackingGeneration++;
+    modelStatus.textContent=kind==='pins-goals'?'This model detects pins and goals only. Toggle color sampling remains available.':'Model loaded. Pick each Toggle’s field-facing strip to track ownership.';
+    if(kind==='pins-goals')toggleModel=undefined;
+  },
+  clear() {
+    unifiedTogglePoints=undefined;debugDetections=[];
+    for(const anchor of trackedToggles.values()){anchor.pendingColor=undefined;anchor.pendingCount=0;}
+    drawToggleDebug();
+  },
+  unload() {
+    toggleModel=undefined;unifiedTogglePoints=undefined;trackingGeneration++;
+    debugDetections=[];drawToggleDebug();modelStatus.textContent='No model loaded. Fixed-point color sampling is available.';
+  },
+  publish(detections) {
+    if(!toggleModel)return;
+    unifiedTogglePoints=associateTogglePoints(detections,trackedToggles);
+    checkToggleFrame(true);
+  }
+};
 
 // Rotated polygon overlap avoids drawing the raw model's duplicate candidates.
 function suppressToggleDuplicates(candidates, width, height) {
@@ -1311,7 +1249,8 @@ function suppressToggleDuplicates(candidates, width, height) {
   return kept.map(k=>k.d);
 }
 let lastToggleScoreCheck = -Infinity;
-async function checkToggleFrame() {
+async function checkToggleFrame(freshUnified = false) {
+  if (toggleModel?.unified && freshUnified !== true) return;
   const source = scoringVideo();
   const preview = toggleDevMode.checked && !!toggleModel;
   if (modelBusy || (!trackedToggles.size && !preview) || scorePanel.hidden ||
@@ -1323,7 +1262,8 @@ async function checkToggleFrame() {
   const model = toggleModel;
   let uncertain = 0;
   try {
-    const points = model ? await detectTogglePoints(model, trackedToggles, source) : trackedToggles;
+    const points = model ? unifiedTogglePoints : trackedToggles;
+    if (!points) return;
     if (generation !== trackingGeneration || scorePanel.hidden || source !== scoringVideo() || model !== toggleModel) return;
     debugDetections = model ? points.detections : [];
     for (const detection of debugDetections) detection.color = undefined;

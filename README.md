@@ -52,7 +52,7 @@ The **Live score** panel works alongside uploaded-video playback and shared-tab 
 
 Detection/color checks run about once per second when active; actual speed depends on the device. The interface keeps the previous state when a reading is unclear.
 
-A separate **Pins and goals model** loader accepts the new two-class, 960×960 raw OBB ONNX export. It draws blue pin-half boxes and green goal boxes without text labels, reports detection counts, and provides a confidence slider (default 0.25). It works with uploaded videos and shared-tab feeds independently of the Toggle loader. Preview inference runs about once per second when the scoring panel is open, subject to device speed.
+The **Vision model — one ONNX file** loader accepts a combined three-class raw OBB export (class 0 Toggle, 1 PIN, 2 Goals), or an older Toggle-only / pins-and-goals model individually. It draws blue pin-half boxes and green goal boxes without text labels, reports detection counts, and provides a confidence slider (default 0.25). It works with uploaded videos and shared-tab feeds. Combined-model results feed Toggle tracking and stack scoring from one inference pass. Preview inference runs about once per second when the scoring panel is open, subject to device speed.
 
 **Live scoring modes:** Choose Match play or Skills. Skills uses a single total and explicit field-quadrant colors; Match play supports projected final or autonomous-period evaluation. Assigned goal stacks can replace scoring-area counts once or after two matching live readings, with manual correction and undo. See [live scoring setup and rules](./docs/LIVE_SCORING.md).
 
@@ -142,7 +142,7 @@ The latest run, **pins-goals-100**, fine-tuned the preceding pin model for **100
 
 These are results reported by the Colab run on neighboring frames from the **same video**, not independent-video or scoring accuracy. They are not directly comparable with the older five-class experiment because the labels and evaluation data changed. The latest weights and validation artifacts remain in Drive; the bundled `models/pins/best.pt` is still the historical five-class checkpoint.
 
-To try the new model, export it using the [pins-and-goals export instructions](./docs/TRAINING.md#pins-and-goals-browser-preview), download the ONNX, open a video in RoboCoach, select **Live score**, and load it under **Pins and goals model**. The browser integration passed synthetic checks for loading, decoding, class-aware duplicate filtering, colors, unloading, and unsupported-output rejection. Real inference with the user's latest exported ONNX still needs verification in the app.
+To try the new model, export it using the [pins-and-goals export instructions](./docs/TRAINING.md#pins-and-goals-browser-preview), download the ONNX, open a video in RoboCoach, select **Live score**, and load it under **Vision model — one ONNX file**. The browser integration passed synthetic checks for loading, decoding, class-aware duplicate filtering, colors, unloading, and unsupported-output rejection. Real inference with the user's latest exported ONNX still needs verification in the app.
 
 ## Roadmap toward an AI coach
 
@@ -207,6 +207,12 @@ Training currently happens separately in Colab, with datasets and model artifact
 | [index.html](./index.html) | App structure and controls |
 | [styles.css](./styles.css) | Layout and styling |
 | [app.js](./app.js) | Video review, local storage, scouting, planners, scoring, and Toggle inference |
-| [pins-goals.js](./pins-goals.js) | Separate pins-and-goals ONNX loader and box preview |
+| [vision-model.js](./vision-model.js) | One ONNX session for combined detection, stack matching and scoring adjustments |
 
 The app is hosted on GitHub Pages. Cleaned notebooks, selected model weights, and evaluation artifacts are now included in this repository. Full training videos and datasets remain separately managed in Drive. See the research links above.
+
+### Single-model interface
+
+Load one ONNX through Live score → Vision model — one ONNX file. A combined model must use class order **0 Toggle, 1 PIN, 2 Goals** and raw OBB output **[1,8,N]**; input size 960 or 640 is detected at load time. Export with end2end=False, nms=False, batch=1, dynamic=False. A single frame inference routes Toggle boxes to ownership tracking and pin/goal boxes to stack matching and optional scoring updates.
+
+The new combined weights are still to be trained. Loading an older model does not combine capabilities: raw [1,6,N] is treated as Toggle-only and [1,7,N] as pin-half/goal. Only one model is active at a time. Synthetic checks covered routing, size detection, shared unload and inference count; real combined-weight verification remains pending.

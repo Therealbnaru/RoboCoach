@@ -44,7 +44,7 @@
 <button type="button" id="pickToggle">Pick on video</button>
 <button type="button" id="clearToggles" disabled>Stop tracking</button>
 </div>
-<label class="toggle-dev"><input id="toggleDevMode" type="checkbox"> Dev mode</label><details class="toggle-model" id="toggleModelControls" hidden><summary>YOLO Toggle model</summary><p class="hint">Load a trained single-class Toggle model: YOLO26 OBB [1, 6, N] or YOLO detection [1, 5, N], exported at 640×640 with NMS off. Dev mode shows detections automatically, about once per second. For each side, use Pick on video and click the strip facing into the field. The white dot marks the color sample. Color buttons and totals update after two matching readings. Re-pick if the camera changes angle.</p><label>ONNX model <input id="toggleModelFile" type="file" accept=".onnx"></label><button type="button" id="unloadToggleModel" disabled>Use color sampling</button><p class="hint" id="toggleModelStatus" role="status">Color sampling active</p></details><p class="hint" id="toggleTrackingStatus" role="status"></p>
+<label class="toggle-dev"><input id="toggleDevMode" type="checkbox" checked> Show Toggle boxes</label><div class="toggle-model" id="toggleModelControls" hidden><p class="hint">Load one ONNX model below. For each Toggle, use Pick on video and click its field-facing strip. A white dot marks the sample; two matching readings update ownership. Re-pick after camera changes.</p><p class="hint" id="toggleModelStatus" role="status">No model loaded. Fixed-point color sampling is available.</p></div><p class="hint" id="toggleTrackingStatus" role="status"></p>
 </div>
 <div class="score-auton"><span>Autonomous bonus</span><select id="scoreAuton" hidden aria-label="Autonomous bonus"><option value="">Pending / none</option><option value="red">Red +12</option><option value="blue">Blue +12</option><option value="tie">Tie +6 each</option></select><div id="scoreAutonChoices" class="score-segments" role="group" aria-label="Autonomous bonus"></div></div>
 <p class="hint" id="scoreChange"></p></section>
@@ -136,8 +136,8 @@
 </form></div>
 </section></main>
 <script src="./override-scoring.js?v=1"></script>
-<script src="./app.js?v=scoring-modes-1"></script>
-<script src="./pins-goals.js?v=4"></script>
+<script src="./app.js?v=one-model-1"></script>
+<script src="./vision-model.js?v=1"></script>
 </html>
 
 

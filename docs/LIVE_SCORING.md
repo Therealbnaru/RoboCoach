@@ -14,8 +14,8 @@ Mode switching reuses the displayed counts and pauses automatic count updates fo
 
 ## Apply model counts
 
-1. Load the Toggle model if desired, and calibrate each field-facing strip using the existing Toggle controls.
-2. Load the pins-and-goals ONNX model.
+1. Load your combined ONNX under Vision model — one ONNX file (0 Toggle, 1 PIN, 2 Goals). This supplies all detections from one inference pass. An older model can be loaded individually, with only its supported detections.
+2. Calibrate each Toggle field-facing strip using the Toggle controls.
 3. In Use detections for scoring, choose the scoring area, select Assign goal on video, and click its green goal-base box. Repeat for both goals in each quadrant and the midfield goal.
 4. Check the area names in the stack summary. Assign only actual goal bases; the detector can produce false goals.
 5. Select Apply counts once, or enable Update scoring counts live.
@@ -30,4 +30,4 @@ Assignments use image positions, not frame-local G numbers. They clear for new v
 
 Run `node tests/override-scoring.cjs` for rule arithmetic and aggregation checks. Additional development checks exercised two-reading stability, apply-once and undo snapshots. Actual scene eligibility cannot be established by these tests: box matching can confuse robot-held/floor objects with stacks, miss visible halves, and cannot determine nesting inside an opaque cup. Verify counts against footage before relying on totals.
 
-The two ONNX models remain separate. ONNX graph composition can package networks together, but does not turn them into a single trained detector or eliminate their compute. A future shared detector would need reviewed labels for Toggle, stacked_pin_half and goal on every training image.
+The app now loads one model and detects its supported raw OBB layout. The planned combined model needs reviewed labels for Toggle, PIN and Goals on every training image, in that exact class order (0/1/2). This interface change does not merge or retrain the existing weights.

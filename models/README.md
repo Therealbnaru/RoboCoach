@@ -42,6 +42,8 @@ The file's interface and metadata were inspected; no new inference benchmark was
 
 ## Latest pins-and-goals model
 
-The app now has a separate two-class pins-and-goals ONNX preview loader. The latest run is pins-goals-100, trained for 100 epochs at 960×960 with class 0 stacked_pin_half and class 1 goal. These newer weights are still managed in Drive and are **not** the historical pins/best.pt linked above.
+The app now has one Vision model ONNX loader supporting a future combined three-class model or one historical model at a time. The latest run is pins-goals-100, trained for 100 epochs at 960×960 with class 0 stacked_pin_half and class 1 goal. These newer weights are still managed in Drive and are **not** the historical pins/best.pt linked above.
 
-See the [latest results and export instructions](../docs/TRAINING.md#pins-and-goals-browser-preview). Export with end2end=False and nms=False, then load the downloaded file under Live score → Pins and goals model. Required raw output is [1,7,N]. Blue and green boxes are detection previews; manual scoring remains separate. Real exported-model browser verification is pending.
+See the [latest results and export instructions](../docs/TRAINING.md#pins-and-goals-browser-preview). Export with end2end=False and nms=False, then load the downloaded file under Live score → Vision model — one ONNX file. Required raw output is [1,7,N]. Blue and green boxes are detection previews; manual scoring remains separate. Real exported-model browser verification is pending.
+
+Combined-model contract: class IDs 0 Toggle, 1 PIN, 2 Goals; raw float32 OBB output [1,8,N], square static input 640 or 960, batch 1. The combined weights are not bundled and have not yet been trained. Existing one- and two-class exports work individually; they are not automatically merged.
