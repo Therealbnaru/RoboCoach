@@ -1,0 +1,24 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');const scope={};vm.createContext(scope);vm.runInContext(fs.readFileSync(require('path').join(__dirname,'../override-scoring.js'),'utf8'),scope);
+const calc=scope.OverrideScoring.calculate,aggregate=scope.RoboCoachVisionScoring.aggregate;
+const areas=()=>Array.from({length:5},()=>({counts:[0,0,0,0,0],toggle:'',quadrant:''}));
+let a=areas();a[0]={counts:[2,1,3],toggle:'red',quadrant:'red'};a[4]={counts:[1,2,4,1,0]};
+let s=calc(a);assert.equal(s.red,93);assert.equal(s.blue,15);
+s=calc(a,{auton:'tie'});assert.equal(s.red,99);assert.equal(s.blue,21);
+s=calc(a,{phase:'autonomous',auton:'red'});assert.equal(s.red,45);assert.equal(s.blue,15);
+s=calc(a,{mode:'skills',auton:'red'});assert.equal(s.skills,103);
+a[0].toggle='blue';s=calc(a,{mode:'skills'});assert.equal(s.skills,73);
+a[0].quadrant='';s=calc(a,{mode:'skills'});assert.equal(s.skills,63);
+a[4].counts=[1,2,4,1,1];s=calc(a);assert.equal(s.red,23);assert.equal(s.blue,53);
+a[4].counts=[0,0,1,2,0];s=calc(a,{mode:'skills'});assert.equal(s.skills,18);
+a[4].counts=[0,0,1,0,2];s=calc(a,{mode:'skills'});assert.equal(s.skills,0);
+const anchor={x:.3,y:.8,width:.08,area:0};
+const group=(x,unknown=0)=>({goal:{x,y:.8},pins:[{}],counts:{red:2,blue:1,yellow:3,unknown}});
+let r=aggregate({goals:[group(.3)]},[anchor]);assert.equal(r.areas.get(0).yellow,3);
+r=aggregate({goals:[group(.3,1)]},[anchor]);assert.equal(r.areas.size,0);assert.equal(r.held.length,1);
+r=aggregate({goals:[]},[anchor]);assert.equal(r.areas.size,0);
+r=aggregate({goals:[group(.3)]},[anchor,{x:.5,y:.8,width:.08,area:0}]);assert.equal(r.areas.size,0);
+r=aggregate({goals:[group(.3)]},[anchor,{x:.31,y:.8,width:.08,area:1}]);assert.equal(r.areas.size,0);
+r=aggregate({goals:[group(.3),group(.305)]},[anchor]);assert.equal(r.areas.size,0);
+r=aggregate({goals:[{...group(.3),pins:[]}]},[anchor]);assert.equal(r.areas.size,0);
+console.log('PASS: match ownership, robot majority/ties, autonomous exclusions, bonus ties, Skills quadrant eligibility, neutral/unknown toggles, one robot limit; assigned aggregation, missing/unknown/empty/ambiguous/duplicate goal holds.');
+

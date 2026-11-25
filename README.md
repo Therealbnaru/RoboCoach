@@ -54,7 +54,9 @@ Detection/color checks run about once per second when active; actual speed depen
 
 A separate **Pins and goals model** loader accepts the new two-class, 960×960 raw OBB ONNX export. It draws blue pin-half boxes and green goal boxes without text labels, reports detection counts, and provides a confidence slider (default 0.25). It works with uploaded videos and shared-tab feeds independently of the Toggle loader. Preview inference runs about once per second when the scoring panel is open, subject to device speed.
 
-**Current limits:** Pin-half scoring inputs remain manual. Detection counts do not establish scoring eligibility or automatically update the score. The Toggle model locates the object; a separate color sampler estimates its state. The sampler follows a calibrated location relative to the detected box, but substantial camera movement, changed perspective, or occlusion may require recalibration. Model predictions are not official referee scores.
+**Live scoring modes:** Choose Match play or Skills. Skills uses a single total and explicit field-quadrant colors; Match play supports projected final or autonomous-period evaluation. Assigned goal stacks can replace scoring-area counts once or after two matching live readings, with manual correction and undo. See [live scoring setup and rules](./docs/LIVE_SCORING.md).
+
+**Current limits:** Detection does not establish scoring eligibility. Robot positioning and autonomous bonuses remain manual; missing or uncertain assigned stacks hold previous counts. The Toggle model locates the object; a separate color sampler estimates its state. The sampler follows a calibrated location relative to the detected box, but substantial camera movement, changed perspective, or occlusion may require recalibration. Model predictions are not official referee scores.
 
 ## Research artifacts you can inspect
 

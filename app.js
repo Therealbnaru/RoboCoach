@@ -876,6 +876,37 @@ for (const title of ['Left Toggle', 'Right Toggle', 'Top Toggle', 'Bottom Toggle
   }
   scoreGoals.append(area);
 }
+for (const area of [...scoreGoals.children].slice(0,4)) {
+  const label=document.createElement('label');
+  label.className='quadrant-setting';label.hidden=true;
+  label.textContent='Field quadrant color ';
+  const select=document.createElement('select');select.className='quadrant-color';
+  for (const [value,text] of [['','Choose red / blue'],['red','Red quadrant'],['blue','Blue quadrant']])
+    select.add(new Option(text,value));
+  select.setAttribute('aria-label',area.querySelector('legend').textContent+' field quadrant color');
+  label.append(select);area.append(label);
+}
+for (const id of ['scoreMode','scorePhase']) byId(id).onchange=()=>{
+  previousScore=undefined;byId('scoreChange').textContent='';refreshLiveScore();
+  document.dispatchEvent(new Event('robocoach-scoring-mode'));
+};
+window.RoboCoachLiveScore={
+  apply(areas) {
+    const previous=new Map();
+    for(const [index] of areas) {
+      const area=scoreGoals.children[index];
+      if(area)previous.set(index,Object.fromEntries(['red','blue','yellow'].map(color=>[color,Number(area.querySelector('#score-'+index+'-'+color).value)||0])));
+    }
+    for(const [index,counts] of areas) {
+      const area=scoreGoals.children[index];
+      if(!area)continue;
+      for(const color of ['red','blue','yellow'])
+        area.querySelector('#score-'+index+'-'+color).value=String(Math.max(0,Math.round(counts[color]||0)));
+    }
+    refreshLiveScore();
+    return previous;
+  }
+};
 makeScoreChoices(byId('scoreAuton'), byId('scoreAutonChoices'), [
   ['', 'None', 'neutral'], ['red', 'Red +12', 'red'], ['tie', 'Tie +6', 'neutral'], ['blue', 'Blue +12', 'blue']
 ]);
@@ -883,26 +914,36 @@ byId('resetScore').onclick = () => {
   if (confirm('Reset all scoring counts, Toggle colors and autonomous bonus? Active tracking will keep updating Toggle colors.')) resetLiveScore();
 };
 function calculateOverrideScore(areas, auton) {
-  const score = {red: 0, blue: 0};
-  for (const {counts, toggle} of areas) {
-    const [red, blue, yellow, redRobots = 0, blueRobots = 0] = counts;
-    score.red += 5 * red + 8 * redRobots;
-    score.blue += 5 * blue + 8 * blueRobots;
-    const owner = toggle ?? (redRobots === blueRobots ? '' : redRobots > blueRobots ? 'red' : 'blue');
-    if (owner) score[owner] += 10 * yellow;
-  }
-  if (auton === 'tie') { score.red += 6; score.blue += 6; }
-  else if (auton) score[auton] += 12;
-  return score;
+  return OverrideScoring.calculate(areas, {auton,mode:byId('scoreMode').value,phase:byId('scorePhase').value});
 }
 function refreshLiveScore() {
+  const skills = byId('scoreMode').value === 'skills';
+  const robotInput = byId('score-4-red-robots');
+  robotInput.max = skills ? '1' : '2';
+  if (Number(robotInput.value) > Number(robotInput.max)) robotInput.value = robotInput.max;
   const areas = [...scoreGoals.children].map(area => ({
     counts: [...area.querySelectorAll('input')].sort((a, b) => Number(a.dataset.scoreOrder) - Number(b.dataset.scoreOrder)).map(input => input.validity.valid ? Number(input.value) || 0 : 0),
-    toggle: area.querySelector('select')?.value
+    toggle: area.querySelector('select')?.value,
+    quadrant: area.querySelector('.quadrant-color')?.value
   }));
   const score = calculateOverrideScore(areas, byId('scoreAuton').value);
   byId('redScore').textContent = score.red;
   byId('blueScore').textContent = score.blue;
+  byId('skillsScore').textContent = score.skills;
+  byId('scoreTotal').hidden = skills;
+  byId('skillsTotal').hidden = !skills;
+  byId('scorePhase').parentElement.hidden = skills;
+  byId('scoreAuton').parentElement.hidden = skills || byId('scorePhase').value === 'autonomous';
+  for (const label of scoreGoals.querySelectorAll('.quadrant-setting')) label.hidden = !skills;
+  const midfield = scoreGoals.lastElementChild;
+  const redRobot = midfield.querySelector('#score-4-red-robots');
+  const blueRobot = midfield.querySelector('#score-4-blue-robots');
+  blueRobot.closest('.score-counter').hidden = skills;
+  redRobot.closest('.score-counter').querySelector('label').lastChild.textContent = skills ? ' Robot in midfield' : ' Red robots';
+  byId('scoreRulesHint').textContent = skills
+    ? 'Skills: choose each quadrant’s field color. Matching colored halves score 5; owned yellow halves score 10; midfield robot scores 8. Unknown colors and unassigned areas are excluded.'
+    : 'Match: red/blue halves score 5 for their alliance; owned yellow halves score 10. Robot points and midfield ownership apply to the projected final state, not autonomous.';
+
   for (const row of scoreGoals.querySelectorAll('.score-counter')) {
     const input = row.querySelector('input');
     const count = Number(input.value) || 0;
@@ -919,7 +960,10 @@ function refreshLiveScore() {
   if (previousScore) {
     const red = score.red - previousScore.red, blue = score.blue - previousScore.blue;
     const signed = value => value > 0 ? '+' + value : String(value);
-    if (red || blue) byId('scoreChange').textContent = 'Last change · Red ' + signed(red) + ' · Blue ' + signed(blue);
+    if (byId('scoreMode').value === 'skills') {
+      const delta = score.skills - previousScore.skills;
+      if (delta) byId('scoreChange').textContent = 'Last change · Skills ' + signed(delta);
+    } else if (red || blue) byId('scoreChange').textContent = 'Last change · Red ' + signed(red) + ' · Blue ' + signed(blue);
   }
   previousScore = score;
 }
@@ -932,7 +976,7 @@ function showLiveScore(show) {
 }
 function resetLiveScore() {
   scoreGoals.querySelectorAll('input[type="number"]').forEach(input => { input.value = '0'; });
-  scoreGoals.querySelectorAll('select').forEach(select => { select.value = ''; });
+  scoreGoals.querySelectorAll('select:not(.quadrant-color)').forEach(select => { select.value = ''; });
   byId('scoreAuton').value = '';
   byId('toggleTarget').selectedIndex = 0;
   if (typeof trackedToggles !== 'undefined') for (const anchor of trackedToggles.values()) { anchor.pendingColor = undefined; anchor.pendingCount = 0; }

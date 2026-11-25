@@ -27,6 +27,13 @@
 <p class="hint" id="status" role="status">Turn on the pen to pause and draw. Click a timeline dot to revisit a drawing or note. Drawings and notes save automatically to your match library.</p>
 <section id="scorePanel" hidden aria-label="Projected Override score">
 <div class="score-heading"><div><span class="score-eyebrow">MATCH CALCULATOR</span><h2>Live score</h2></div><button type="button" id="resetScore" class="score-reset" aria-label="Reset all scoring counts and bonuses">Reset</button></div>
+<div class="tools" style="margin-bottom:12px">
+<label>Scoring mode <select id="scoreMode"><option value="match">Match play</option><option value="skills">Skills (Driving / Autonomous)</option></select></label>
+<label>Evaluate <select id="scorePhase"><option value="match">Projected final score</option><option value="autonomous">Autonomous period only</option></select></label>
+</div>
+<p class="hint" id="scoreRulesHint"></p>
+<p class="hint"><a href="https://manuals.vex.com/v5/override/v2.1/game/#scoring" target="_blank" rel="noopener">Match rules</a> · <a href="https://manuals.vex.com/v5/override/v2.1/skills/" target="_blank" rel="noopener">Skills rules</a> · V5RC v2.1 · Estimated live score; verify settled scoring status.</p>
+<output id="skillsTotal" class="scoreboard" hidden><span class="alliance-total"><span>Skills score</span><strong id="skillsScore">0</strong></span></output>
 <output id="scoreTotal" class="scoreboard" aria-live="polite" aria-atomic="true"><span class="alliance-total red"><span>Red alliance</span><strong id="redScore">0</strong></span><span class="score-versus" aria-hidden="true">VS</span><span class="alliance-total blue"><span>Blue alliance</span><strong id="blueScore">0</strong></span></output>
 <p class="score-instruction">Tap + or − to count scoring Pin halves. Select the settled color of each Toggle.</p>
 <div id="scoreGoals"></div>
@@ -128,8 +135,9 @@
 <div class="tools wide"><button type="submit">Save profile</button><span class="hint" id="profileStatus" role="status">Saved in this browser.</span></div>
 </form></div>
 </section></main>
-<script src="./app.js?v=fullscreen-2"></script>
-<script src="./pins-goals.js?v=3"></script>
+<script src="./override-scoring.js?v=1"></script>
+<script src="./app.js?v=scoring-modes-1"></script>
+<script src="./pins-goals.js?v=4"></script>
 </html>
 
 

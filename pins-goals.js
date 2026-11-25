@@ -84,13 +84,85 @@
     <p class="hint">Stack links are estimates. Dashed pin boxes are unmatched; ? means unclear color. Goal IDs apply to the current frame.</p>
     <div class="stack-summary" aria-label="Estimated stacks"></div>
     <button type="button" disabled>Unload pins and goals</button>
-    <p class="hint" role="status">No pins and goals model loaded.</p>`;
+    <p class="hint" role="status">No pins and goals model loaded.</p>
+    <fieldset><legend>Use detections for scoring</legend>
+    <p class="hint">Assign each real goal base to a scoring area. Assign both goals in a quadrant. Reassign after camera movement. Only assigned stacks with known colors update counts; missing/empty detections keep previous counts.</p>
+    <label>Scoring area <select class="vision-area"><option value="0">Left Toggle area</option><option value="1">Right Toggle area</option><option value="2">Top Toggle area</option><option value="3">Bottom Toggle area</option><option value="4">Midfield</option></select></label>
+    <button type="button" class="vision-pick">Assign goal on video</button>
+    <button type="button" class="vision-clear">Clear assignments</button>
+    <label class="toggle-dev"><input type="checkbox" class="vision-auto"> Update scoring counts live</label>
+    <button type="button" class="vision-apply">Apply counts once</button>
+    <button type="button" class="vision-undo" disabled>Undo last count update</button>
+    <p class="hint vision-status" role="status">No goals assigned. Counts remain manual.</p>
+    </fieldset>`;
   byId('toggleModelControls').parentElement.append(controls);
   const [file, visible, threshold] = controls.querySelectorAll('input');
   const matching = controls.querySelectorAll('input')[3];
   const summary = controls.querySelector('.stack-summary');
   const stop = controls.querySelector('button');
   const status = controls.querySelector('[role="status"]');
+  const areaSelect=controls.querySelector('.vision-area'), pick=controls.querySelector('.vision-pick');
+  const automatic=controls.querySelector('.vision-auto'), apply=controls.querySelector('.vision-apply');
+  const undo=controls.querySelector('.vision-undo'), visionStatus=controls.querySelector('.vision-status');
+  const areaNames=['Left','Right','Top','Bottom','Midfield'];
+  let anchors=[],picking=false,pendingAreas=new Map(),undoCounts;
+  function pauseAutomatic(message) {
+    automatic.checked=false;pendingAreas.clear();if(message)visionStatus.textContent=message;
+  }
+  pick.onclick=()=>{
+    const source=scoringVideo();
+    if(!source||!stacks){visionStatus.textContent='Load the model and a video first.';return;}
+    setPen(false);picking=!picking;
+    pick.textContent=picking?'Cancel goal assignment':'Assign goal on video';
+    visionStatus.textContent=picking?'Click a green goal-base box for '+areaNames[Number(areaSelect.value)]+'.':'Assignment cancelled.';
+  };
+  controls.querySelector('.vision-clear').onclick=()=>{
+    anchors=[];pauseAutomatic('Assignments cleared. Counts kept for manual review.');describeStacks();
+  };
+  function useCounts(live=false) {
+    if(!stacks||!anchors.length){visionStatus.textContent='Assign goal bases first.';return;}
+    const result=RoboCoachVisionScoring.aggregate(stacks,anchors),accepted=new Map();
+    for(const [area,counts] of result.areas) {
+      const key=JSON.stringify(counts),previous=pendingAreas.get(area);
+      const readings=previous?.key===key?previous.readings+1:1;
+      pendingAreas.set(area,{key,readings});
+      if(!live||readings>=2)accepted.set(area,counts);
+    }
+    for(const area of result.held)pendingAreas.delete(area);
+    if(accepted.size){undoCounts=window.RoboCoachLiveScore.apply(accepted);undo.disabled=false;}
+    visionStatus.textContent=anchors.length+' goals assigned · '+accepted.size+' areas updated · '+result.held.length+
+      ' areas held (missing, empty, ambiguous or unknown color). Unassigned areas stay manual.'+(live?' Live updates need two matching readings.':'');
+  }
+  apply.onclick=()=>useCounts(false);
+  automatic.onchange=()=>{pendingAreas.clear();visionStatus.textContent=automatic.checked?'Live count updates enabled; waiting for stable assigned stacks.':'Live updates paused. Counts can be edited manually.';};
+  undo.onclick=()=>{pauseAutomatic();if(undoCounts)window.RoboCoachLiveScore.apply(undoCounts);undoCounts=undefined;undo.disabled=true;visionStatus.textContent='Last count update undone. Live updates paused.';};
+  function manualEdit(event) {
+    if(event.target.matches?.('input[type="number"]')||event.target.closest?.('.score-step'))
+      pauseAutomatic('Manual correction: live updates paused so your edit is kept.');
+  }
+  scorePanel.addEventListener('input',manualEdit);
+  scorePanel.addEventListener('click',manualEdit);
+  document.addEventListener('robocoach-scoring-mode',()=>{pauseAutomatic('Scoring mode changed. Review assignments, then enable live updates.');});
+  byId('resetScore').addEventListener('click',()=>pauseAutomatic('Live updates paused for score reset.'));
+  for(const source of [video,liveTabVideo]) {
+    source.addEventListener('loadedmetadata',()=>{anchors=[];undoCounts=undefined;undo.disabled=true;pauseAutomatic('New video: assign its goal bases before using detections.');});
+    source.addEventListener('click',event=>{
+      if(!picking||!stacks)return;
+      event.preventDefault();event.stopImmediatePropagation();
+      const bounds=source.getBoundingClientRect(),scale=Math.min(bounds.width/source.videoWidth,bounds.height/source.videoHeight);
+      const w=source.videoWidth*scale,h=source.videoHeight*scale;
+      const point={x:(event.clientX-bounds.left-(bounds.width-w)/2)/w,y:(event.clientY-bounds.top-(bounds.height-h)/2)/h};
+      const choices=stacks.goals.filter(g=>{
+        const local=toggleFaceOffset(g.goal,point,source.videoWidth,source.videoHeight);
+        return Math.abs(local.u)<=.65&&Math.abs(local.v)<=.65;
+      }).sort((a,b)=>Math.hypot(a.goal.x-point.x,a.goal.y-point.y)-Math.hypot(b.goal.x-point.x,b.goal.y-point.y));
+      if(!choices.length){visionStatus.textContent='Click inside a green goal-base box.';return;}
+      const goal=choices[0].goal,area=Number(areaSelect.value);
+      anchors=anchors.filter(a=>Math.hypot(a.x-goal.x,a.y-goal.y)>.025);
+      anchors.push({x:goal.x,y:goal.y,width:goal.width,area});
+      picking=false;pick.textContent='Assign goal on video';pauseAutomatic(anchors.length+' goals assigned. Review their labels, then Apply counts once or enable live updates.');describeStacks();
+    },true);
+  }
   const overlay = document.createElement('canvas');
   overlay.setAttribute('aria-hidden', 'true');
   Object.assign(overlay.style, {position:'absolute', inset:'0', width:'100%', height:'100%', pointerEvents:'none', zIndex:'1'});
@@ -99,7 +171,7 @@
   input.width = input.height = 960;
   const ctx = input.getContext('2d', {willReadFrequently:true});
   let model, busy = false, loading = false, generation = 0, boxes = [], stacks, lastRun = -Infinity;
-  function clear() { boxes = []; stacks = undefined; summary.replaceChildren(); overlay.getContext('2d').clearRect(0,0,overlay.width,overlay.height); }
+  function clear() { boxes = []; stacks = undefined; pendingAreas.clear(); summary.replaceChildren(); overlay.getContext('2d').clearRect(0,0,overlay.width,overlay.height); }
   function draw() {
     const source = scoringVideo();
     overlay.hidden = !visible.checked || scorePanel.hidden || !frozenLiveFrame.hidden;
@@ -138,13 +210,14 @@
     for (const group of stacks.goals) {
       const row=document.createElement('p'), n=group.counts;
       row.className='hint';row.style.margin='5px 0';
-      row.textContent=group.id+': '+(group.pins.length
+      const assigned=anchors.filter(a=>Math.hypot(a.x-group.goal.x,a.y-group.goal.y)<Math.max(.035,a.width*.7)).sort((a,b)=>Math.hypot(a.x-group.goal.x,a.y-group.goal.y)-Math.hypot(b.x-group.goal.x,b.y-group.goal.y))[0];
+      row.textContent=group.id+(assigned?' → '+areaNames[assigned.area]:' (unassigned)')+': '+(group.pins.length
         ? n.yellow+' yellow · '+n.red+' red · '+n.blue+' blue · '+n.unknown+' unknown'
         : 'No matched halves (empty or missed/occluded)');
       summary.append(row);
     }
     const row=document.createElement('p');row.className='hint';
-    row.textContent=stacks.unmatched.length+' unmatched halves, including '+stacks.ambiguous.length+' ambiguous. No score changes.';
+    row.textContent=stacks.unmatched.length+' unmatched halves, including '+stacks.ambiguous.length+' ambiguous. Unknown and unmatched halves are excluded from count updates.';
     summary.append(row);
   }
   matching.onchange=()=>{draw();summary.hidden=!matching.checked;};
@@ -187,6 +260,7 @@
     old.session.release().catch(console.error);
   }
   stop.onclick = () => {
+    pauseAutomatic('Model unloaded; counts kept for manual review.');
     const old = model; model = undefined; generation++; clear(); stop.disabled = true;
     status.textContent = 'Pins and goals unloaded.'; if (old) retire(old);
   };
@@ -221,9 +295,10 @@
         b.color=RoboCoachStacks.color(b,rgba,960,{width,height,scale,dx,dy});
       stacks=RoboCoachStacks.match(boxes,width,height);
       describeStacks();
+      if(automatic.checked)useCounts(true);
       draw();
       status.textContent = boxes.filter(b=>b.classId===0).length+' pin halves · '+boxes.filter(b=>b.classId===1).length+
-        ' goals · Confidence '+Number(threshold.value).toFixed(2)+'. Preview only; scoring counts stay manual.';
+        ' goals · Confidence '+Number(threshold.value).toFixed(2)+'. Assigned stacks can update counts using the controls below.';
     } catch (error) {
       if (token === generation) { clear(); status.textContent = 'Preview failed: '+String(error.message).slice(0,200); }
     } finally { busy = false; }
